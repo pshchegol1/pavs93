@@ -3,5 +3,6 @@ classroom demonstrations
 Pavlo Shchegol (student)
 
 pavel.shhegl@mail.ru
-780-257-2493
+
+Phone(780-257-2493)
 
