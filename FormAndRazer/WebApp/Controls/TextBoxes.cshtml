@@ -18,7 +18,38 @@
 }
 
 <!--content body-->
-    <form id="theform" method="post">
+@if (IsPost)
+{
+    if (thebutton.Equals("reset"))
+    {
+        leftside = "";
+        rightside = "";
+    }
+    else
+    {
+
+   
+    //Validation of data coming in
+        if (string.IsNullOrEmpty(leftside) || string.IsNullOrEmpty(rightside))
+        {
+            <p>Enter Data in  both fields (name and color).</p>
+        }
+
+        else
+        {
+            if (thebutton.Equals("leftinput"))
+            {
+                <p>Hello. Your Name is @leftside .</p>
+            }
+            else
+            {
+                <p>@leftside,  Your favourite color is @rightside .</p>
+            }
+        }
+    }
+}
+<form id="theform" method="post">
+    <div class="row">
         <div class="col-md-6">
             <label for="leftinput">Your Name:</label>
             <input type="text" id="leftinput" name="leftinput"
@@ -31,13 +62,20 @@
         <div class="col-md-6">
             <label for="rightinput">Your Favourite Color:</label>
             <input type="text" id="rightinput" name="rightinput"
-                   placeholder="enter your color"  value="@rightside"/>
+                   placeholder="enter your color" value="@rightside" />
             <button type="submit" id="formbutton" name="formbutton"
                     class="btn" value="rightinput">
                 Press Right
             </button>
         </div>
-    </form>
+    </div>
+    <div class="row">
+        <div class="col-md-offset-5">
+            <button type="submit" id="formbutton" name="formbutton" class="btn" value="reset">Reset</button>
+            
+        </div>
+    </div>
+</form>
 
 
 @section footer{
