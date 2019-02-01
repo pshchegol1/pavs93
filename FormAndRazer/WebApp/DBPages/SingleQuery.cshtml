@@ -1,0 +1,66 @@
+﻿@{
+    Layout = "~/_Layout.cshtml";
+    Page.Title = "SingleQuery";
+    var searcharg = Request.Form["searcharg"];
+    var regionid = "";
+    var description = "";
+    //remember the 1st pass of the page, searcharg will be null BUT for tge DB query it needs to be a number
+    if (string.IsNullOrEmpty(searcharg))
+    {
+        searcharg = "0";
+    }
+
+    //Open connection to the database, use the connection string name attribute value
+    var db = Database.Open("NWDB");
+
+    //Is create SQL command that you wish to execute, a placeholder @n will be used for  the query argument
+    //query command can be coded on multiple physical lines
+    var querycommand = "SELECT RegionID, RegionDescription "
+        + "FROM Region "
+        + "WHERE RegionID = @0";
+
+    //execute query command against database
+    //.QuerySingle() used when you expect a single record to be returned
+    //.Query() used when you expect 0, 1 or more recordes to be return
+    //.QueryValue() used when you expect a single value (not record) to be returned
+    var results = db.QuerySingle(querycommand, searcharg);
+
+}
+
+
+@section head{
+    <link href="~/Content/MyCustomStyles.css" rel="stylesheet" />
+}
+
+
+<form id="theform" method="post">
+    <div class="row">
+        <div class="col-md-4">
+            <label for="searcharg">Enter Region ID:</label>
+            <input type="text" id="searcharg" name="searcharg"
+                   placeholder="enter region ID" value="@searcharg" />
+            <br />
+            <button type="submit" id="formbutton" name="formbutton"
+                    class="btn" value="search">
+                Search
+            </button>
+            &nbsp;&nbsp;
+        </div>
+        <div class="colo-md-8">
+            <label for="regionid"> Region ID:</label>
+            <input type="text" id="regionid" name="regionid"
+                   value="@regionid" />
+            <label for="description">Enter Region Name:</label>
+            <input type="text" id="description" name="description"
+                    value="@description" />
+        </div>
+    </div>
+
+</form>
+
+@section banner{
+    <h1>DropDown for Razor</h1>
+}
+@section footer{
+    &copy; CPSC1517 NAIT, All rights reserved
+}

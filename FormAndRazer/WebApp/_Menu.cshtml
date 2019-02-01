@@ -9,21 +9,32 @@
        </a>
 </div>
     <!--menu root area-->
-    <ul class="nav navbar-nav">
-        <!--root menu item-->
-        <li><a href="@Href("~/Default.cshtml")">Home</a></li>
-        <!--drop down submenu-->
-        <li class="dropdown">
-            <!--drop down menu item toggle-->
-            <a href="#" class="dropdown-toggle" data-toggle="dropdown">Controls <b class="caret"></b></a>
-            <!---code the drop down submenu items-->
-            <ul class="dropdown-menu">
-                <li><a href="@Href("~/Controls/TextBoxes.cshtml")">TextBoxes</a></li>
-                <li><a href="@Href("~/Controls/RadioButtons.cshtml")">RadioButtons</a></li>
-                <li><a href="@Href("~/Controls/CheckBoxes.cshtml")">CheckBoxes</a></li>
-                <li><a href="@Href("~/Controls/DropDown.cshtml")">DropDown (select)</a></li>
-            </ul>
-        </li>
-    </ul>
+<ul class="nav navbar-nav">
+    <!--root menu item-->
+    <li><a href="@Href("~/Default.cshtml")">Home</a></li>
+    <!--drop down submenu-->
+    <li class="dropdown">
+        <!--drop down menu item toggle-->
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Controls <b class="caret"></b></a>
+        <!---code the drop down submenu items-->
+        <ul class="dropdown-menu">
+            <li><a href="@Href("~/Controls/TextBoxes.cshtml")">TextBoxes</a></li>
+            <li><a href="@Href("~/Controls/RadioButtons.cshtml")">RadioButtons</a></li>
+            <li><a href="@Href("~/Controls/CheckBoxes.cshtml")">CheckBoxes</a></li>
+            <li><a href="@Href("~/Controls/DropDown.cshtml")">DropDown (select)</a></li>
+        </ul>
+    </li>
+    <li class="dropdown">
+        <!--drop down menu item toggle-->
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown">DB PAges <b class="caret"></b></a>
+        <!---code the drop down submenu items-->
+        <ul class="dropdown-menu">
+            <li><a href="@Href("~/Controls/TextBoxes.cshtml")">TextBoxes</a></li>
+            <li><a href="@Href("~/DBPages/SingleQuery.cshtml")">DB</a></li>
+            <li><a href="@Href("~/Controls/CheckBoxes.cshtml")">CheckBoxes</a></li>
+            <li><a href="@Href("~/Controls/DropDown.cshtml")">DropDown (select)</a></li>
+        </ul>
+    </li>
+</ul>
 
 </div>
