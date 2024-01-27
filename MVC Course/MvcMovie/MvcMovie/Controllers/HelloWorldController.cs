@@ -16,7 +16,7 @@ public class HelloWorldController : Controller
     // GET: /HelloWorld/Welcome/ 
     public IActionResult Welcome(string name, int numTimes = 1)
     {
-        ViewData["Message"] = "Hello World" + name;
+        ViewData["Message"] = "Hello World Step 2" + name;
         ViewData["NumTimes"] = numTimes;
         return View();
     }
