@@ -14,6 +14,8 @@ function App() {
     duration: 10
 });
 
+const inputIsValid = userInput.duration >= 1;
+
 function handleCahnge(inputIdentifier, newValue){
   setUserInput(prevUserInput => {
       return{
@@ -28,7 +30,8 @@ function handleCahnge(inputIdentifier, newValue){
     <>
         <Header/>
         <UserInput userInput={userInput} onChange={handleCahnge}/>
-        <Results input={userInput}/>
+        {!inputIsValid && <p className="center">Please enter a valid input.</p>}
+        {inputIsValid && <Results input={userInput}/>}
     </>
 
   )
