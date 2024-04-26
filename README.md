@@ -2,8 +2,9 @@
 Random Projects
 Pavlo Shchegol 
 ------------------------------------------------------------------------------------------------
-https://github.com/academind/react-complete-guide-course-resources/tree/main/attachments
-- Udemy React Course GitHub - All Code.
+- Udemy React Course GitHub - All Code: https://github.com/academind/react-complete-guide-course-resources/tree/main/code
+
+
 
 
 
