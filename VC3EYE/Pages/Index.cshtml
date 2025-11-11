@@ -1,0 +1,263 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+
+    int runningServices = Model.services.Where(x => x.IsRunning).ToList().Count;
+    int downServices = Model.services.Where(x => !x.IsRunning).ToList().Count;
+    var time = new TimeSpan();
+    string filtered = (Model.IsFiltered) ? "Filtered" : "";
+    string? location = Request.Query["location"];
+
+    DateTime beginningOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    DateTime currentDate = DateTime.Now;
+    int daysInMonth = DateTime.DaysInMonth(currentDate.Year, currentDate.Month) + 1;
+    string month = beginningOfMonth.ToString("MMMM");
+}
+
+<div class="border-1 mt-4">
+    <br />
+    <!--will hold the services and populate the status for each service available in the Database-->
+    <form method="post" class="form-inline" asp-page-handler="Search">
+        <div class="search-container">
+            <div class="row">
+                <div class="col-6">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" placeholder="Search Services" name="search" asp-for="search">
+                        <button class="btn btn-dark" title="Search Services" type="submit" id="button-addon2"><i class="bi bi-search"></i></button>
+
+                    </div>
+                    <span asp-validation-for="search" name="search" type="text" id="servicesearch" name="service" class="text-danger"></span>
+                </div>
+                <div class="col-6">
+                    <div class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuLocations" data-bs-toggle="dropdown" aria-expanded="false" style="width:100%;">
+                            Locations
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuLocations" style="width:100%;">
+                            @if (Model.Locations != null && Model.Locations.Count > 0)
+                            {
+                                foreach (string l in Model.Locations)
+                                {
+                                    <li><a class="dropdown-item" asp-route-location="@l.ToLower()">@l.ToUpper()</a></li>
+                                }
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+    <hr />
+    <div class="d-flex">
+        @if (runningServices > 0)
+        {
+            <div class="card services-up" style="width: 110px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of services running">
+                <div class="card-header d-flex justify-content-between">
+                    <span><i class="bi bi-arrow-up-circle-fill"></i></span>
+                    <span><b>@runningServices</b></span>
+                </div>
+            </div>
+        }
+        @if (downServices > 0)
+        {
+            <div class="card services-down ms-3" style="width: 110px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of services down">
+                <div class="card-header d-flex justify-content-between">
+                    <span><i class="bi bi-arrow-down-circle-fill"></i></span>
+                    <span><b>@downServices</b></span>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="mt-lg-4 table-reponsive main-table-content">
+        @if (Model.IsFiltered)
+        {
+            <h4><span class="badge bg-dark">@filtered</span></h4>
+        }
+        @if (!string.IsNullOrEmpty(location))
+        {
+            <h4><span class="badge bg-dark">Results for @location.ToUpper()</span></h4>
+        }
+        <table class="table  table-bordered table-hover">
+            <tbody>
+                @if (Model.services != null && Model.services.Any())
+                {
+                    @foreach (var service in Model.services)
+                    {
+                        //Checking if the service is marked for activly checking and also not deleted
+                        if (service.IsActive || !service.IsDeleted)
+                        {
+                            //Checking if the services is running as intended of flagged as down
+                            if (service.IsRunning)
+                            {
+                                <tr class="services-table table-success">
+                                    <td>
+                                        <a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a>
+                                        <br> <span class="badge badge-success">Running</span>
+                                        <div class="main-down-history d-flex justify-content-between mt-3">
+                                            @for (int i = 1; i < daysInMonth; i++)
+                                            {
+                                                if (service.ServiceDownHistories != null && service.ServiceDownHistories.Count() > 0)
+                                                {
+                                                    foreach (var down in service.ServiceDownHistories)
+                                                    {
+                                                        DateTime da = down.DateAdded;
+                                                        bool matchMonth = (down.DateAdded.Month == currentDate.Month);
+                                                        int d = (da - beginningOfMonth).Days + 1;
+
+                                                        if (i == d && matchMonth)
+                                                        {
+                                                            int timesDown = service.ServiceDownHistories.Where(x => x.DateAdded.Date == down.DateAdded.Date).ToList().Count;
+                                                            string title = "<div class='times-down-con'><span>Down: " + timesDown + " time(s)</span></div>";
+
+                                                            <div class="days-down" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="@month @i @title"></div>
+                                                            i++;
+                                                        }
+                                                    }
+                                                }
+
+                                                if (i <= currentDate.Day)
+                                                {
+                                                    <div class="days-up" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="days-future" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
+                                                }                                             
+                                            }                                          
+                                        </div>
+                                    </td>
+                                    <td>
+                                        Last time checked:<br>
+                                        @service.LastTimeChecked
+                                    </td>
+
+                                    @if (service.ServiceDownHistories.Count() != 0)
+                                    {
+                                        <td>
+                                            Last time Down:<br>
+                                            @service.ServiceDownHistories.Last().BackUpDateTime
+                                        </td>
+
+                                        <td>
+                                            Last time since down:<br>
+                                            @{
+                                                if (service.ServiceDownHistories.Last().BackUpDateTime != null)
+                                                    time = (TimeSpan)(DateTime.Now - service.ServiceDownHistories.Last().BackUpDateTime);
+                                            }
+                                            @(time.Days)D @(time.Hours)H @(time.Minutes)M
+                                        </td>
+                                    }
+                                    else
+                                    {
+                                        <td>
+                                            Last time Down:<br>
+                                            N/A
+                                        </td>
+                                        <td>
+                                            Last time since Down:<br>
+                                            N/A
+                                        </td>
+                                    }
+
+                                    @if (service.NotificationMessage != null)
+                                    {
+
+                                        <td>@service.NotificationMessage</td>
+                                    }
+                                    else
+                                    {
+                                        <td></td>
+                                    }
+                                </tr>
+                            }
+                            else //Downed service
+                            {
+                                <tr class="services-table table-danger">
+                                    <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a>
+                                        <br> <span class="badge badge-danger">Down</span>
+                                        <div class="main-down-history d-flex justify-content-between mt-3">
+                                            @for (int i = 1; i < daysInMonth; i++)
+                                            {
+                                                if (service.ServiceDownHistories != null && service.ServiceDownHistories.Count() > 0)
+                                                {
+                                                    foreach (var down in service.ServiceDownHistories)
+                                                    {
+                                                        DateTime da = down.DateAdded;
+                                                        bool matchMonth = (down.DateAdded.Month == currentDate.Month);
+                                                        int d = (da - beginningOfMonth).Days + 1;
+
+                                                        if (i == d && matchMonth)
+                                                        {
+                                                            int timesDown = service.ServiceDownHistories.Where(x => x.DateAdded.Date == down.DateAdded.Date).ToList().Count;
+                                                            string title = "<div class='times-down-con'><span>Down: " + timesDown + " time(s)</span></div>";
+
+                                                            <div class="days-down" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="@month @i @title"></div>
+                                                            i++;
+                                                        }
+                                                    }
+                                                }
+
+                                                if (i <= currentDate.Day)
+                                                {
+                                                    <div class="days-up" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="days-future" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
+                                                }
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        Last time checked:<br>
+                                        @service.LastTimeChecked
+                                    </td>
+
+                                    @if (service.ServiceDownHistories.Count != 0)
+                                    {
+                                        <td>
+                                            Last time Running:<br>
+                                            @service.ServiceDownHistories.Last().DateAdded
+                                        </td>
+
+                                        <td>
+                                            Last time since Running:<br>
+                                            @{
+                                                time = (DateTime.Now - service.ServiceDownHistories.Last().DateAdded);
+                                            }
+                                            @(time.Days)D @(time.Hours)H @(time.Minutes)M
+                                        </td>
+                                    }
+                                    else
+                                    {
+                                        <td>
+                                            Last time Down:<br>
+                                            N/A
+                                        </td>
+                                        <td>
+                                            Last time since Down:<br>
+                                            N/A
+                                        </td>
+                                    }
+
+                                    @if (service.NotificationMessage != null)
+                                    {
+
+                                        <td>@service.NotificationMessage</td>
+                                    }
+                                    else
+                                    {
+                                        <td></td>
+                                    }
+
+                                </tr>
+                            }
+                        }
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

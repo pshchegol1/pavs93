@@ -1,0 +1,298 @@
+﻿@page
+@model VC3EYE.Pages.ServiceInfoModel
+@using VC3EYE.Data;
+@{
+    int serviceID = Model.ServiceDetails.ServiceId;
+    string location = Model.ServiceDetails.Location ?? "";
+    string ipAddress = Model.ServiceDetails.Ipaddress ?? "No IP Address Provided";
+    string serviceUrl = Model.ServiceDetails.Url;
+    string serviceName = Model.ServiceDetails.ServiceName;
+    string downTimes = Model.ServiceDetails.NumOfDownTimes.ToString() ?? "0";
+    string lastTimeChecked = Model.ServiceDetails.LastTimeChecked.ToString("dddd, dd MMMM yyyy h:mm tt");
+    string description = Model.ServiceDetails.GeneralInformation ?? "";
+    string dateAdded = Model.ServiceDetails.DateAdded.ToString("dddd, dd MMMM yyyy h:mm tt");
+    string lastDateModified = Model.ServiceDetails.LastDateModified.ToString("dddd, dd MMMM yyyy h:mm tt");
+    string intExt = (Model.ServiceDetails.IsInternal) ? "Internal" : "External";
+    string isRunning = (Model.ServiceDetails.IsActive && Model.ServiceDetails.IsRunning) ? "Running" : (!Model.ServiceDetails.IsActive && !Model.ServiceDetails.IsDeleted) ? "Paused" : (!Model.ServiceDetails.IsActive && Model.ServiceDetails.IsDeleted) ? "Deleted" : "Down";
+    string important = (Model.ServiceDetails.IsImportant) ? "Important" : "Not Important";
+    string rssFeedLink = Model.ServiceDetails.RssfeedLink ?? "No RSS provided";
+    string lookupTerm = Model.ServiceDetails.LookupTerm ?? "No Term provided";
+    string portNum = Model.ServiceDetails.Port.ToString() ?? "";
+    string checkInterval = Model.ServiceDetails.CheckInterval.TotalMinutes.ToString() + " min";
+    string numOfBackup = Model.ServiceDetails.NumOfBackup.ToString() ?? "";
+    string addedBy = Model.ServiceDetails.User.FirstName + " " + Model.ServiceDetails.User.LastName;
+    string notificationMsg = Model.ServiceDetails.NotificationMessage ?? "No message provided";
+    string pauseStatus = (Model.ServiceDetails.IsActive && !Model.ServiceDetails.IsDeleted) ? "Pause" : "Resume";
+
+    //Edit Status Modal  
+    string bg = (Model.ServiceDetails.IsRunning) ? "bg-success" : "bg-danger";
+
+    ViewData["Title"] = serviceName + " Information";
+}
+
+<br />
+
+<div class="service-info-con container-fluid">
+    @if (User.IsInRole(SiteRoles.Administrator) || User.IsInRole(SiteRoles.User))
+    {
+        <div class="d-flex justify-content-end">
+            @if (Model.ServiceDetails.IsDeleted)
+            {
+                <form method="post" asp-page="/ServiceInfo" asp-page-handler="UndoDelete" asp-route-serviceid="@serviceID">
+                    <input hidden asp-for="@Model.ServiceDetails.ServiceName" />
+                    <button type="submit" class="btn btn-outline-dark m-1"><i class="bi bi-arrow-counterclockwise"></i> Undo Delete</button>
+                </form>
+            }
+            @if (!Model.ServiceDetails.IsDeleted)
+            {
+                @*<button type="button" class="btn btn-outline-dark m-1"><i class="bi bi-file-earmark-excel"></i> Report</button>*@
+                <a asp-page="/EditService" asp-route-serviceid="@serviceID" class="btn btn-outline-dark m-1"><i class="bi bi-pencil-square"></i> Edit Service</a>
+                <form method="post" asp-page="/ServiceInfo" asp-page-handler="PauseService" asp-route-serviceid="@serviceID">
+                    <input hidden asp-for="@Model.ServiceDetails.ServiceName" />
+                    <button type="submit" class="btn btn-outline-dark m-1">
+                        @if (Model.ServiceDetails.IsActive)
+                        {
+                            <i class="bi bi-pause-btn"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-play-fill"></i>
+                        }
+
+                        @pauseStatus Service Checking
+                    </button>
+                </form>
+            }
+            @if (Model.ServiceDetails.IsActive && !Model.ServiceDetails.IsDeleted)
+            {
+                <button type="button" class="btn btn-outline-dark m-1" data-bs-toggle="modal" data-bs-target="#editStatusModal"><i class="bi bi-pencil-square"></i> Edit Status</button>
+            }
+        </div>
+    }
+    
+    <hr />
+    <partial name="_Message" />
+
+    @if (Model.ServiceDetails != null && Model.ServiceDetails.IsDeleted)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong><i class="bi bi-exclamation-triangle-fill"></i> Attention!</strong> The @serviceName service has been deleted.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-6">
+            <div class="row d-flex justify-content-between">
+                <div class="col-4">
+                    <div class="input-group mb-3">
+                        <span class="input-group-text running-status @isRunning.ToLower()" id="basic-addon3" data-bs-toggle="tooltip" data-bs-placement="right" title="Service is @isRunning">
+                            @if (Model.ServiceDetails.IsActive && Model.ServiceDetails.IsRunning && !Model.ServiceDetails.IsDeleted)
+                            {
+                                <i class="bi bi-check-circle-fill"></i>
+                            }
+                            else if (!Model.ServiceDetails.IsActive && !Model.ServiceDetails.IsDeleted)
+                            {
+                                <i class="bi bi-pause-circle-fill"></i>
+                            }
+                            else if (!Model.ServiceDetails.IsActive && Model.ServiceDetails.IsDeleted)
+                            {
+                                <i class="bi bi-trash3-fill"></i>
+                            }
+                            else
+                            {
+                                <i class="bi bi-x-circle-fill"></i>
+                            }
+                        </span>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" disabled asp-for="@important" aria-describedby="basic-addon3">
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" disabled asp-for="@intExt" aria-describedby="basic-addon3">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6">
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" disabled asp-for="@ipAddress" aria-describedby="basic-addon3">
+            </div>
+        </div>
+        <div class="col-6 mb-3">
+            <label asp-for="@serviceName">Service Name</label>
+            <input type="text" class="form-control" disabled asp-for="@serviceName" aria-describedby="basic-addon3">
+        </div>
+        <div class="col-6">
+            <label asp-for="@serviceUrl">Service URL</label>
+            <input type="text" class="form-control" disabled asp-for="@serviceUrl" aria-describedby="basic-addon3">
+        </div>
+        <div class="col-12">
+            <div class="row">
+                <div class="col-3">
+                    <label asp-for="@location">Location</label>
+                    <input type="text" class="form-control" disabled asp-for="@location" aria-describedby="basic-addon3">
+                </div>
+                <div class="col-3">
+                    <label asp-for="@downTimes">Times Down</label>
+                    <input type="text" class="form-control" disabled asp-for="@downTimes" aria-describedby="basic-addon3">
+                </div>
+                <div class="col-3">
+                    <label asp-for="@lastTimeChecked">Last Time Checked</label>
+                    <input type="text" class="form-control" disabled asp-for="@lastTimeChecked" aria-describedby="basic-addon3">
+                </div>
+                <div class="col-3">
+                    <label asp-for="@portNum">Port</label>
+                    <input type="text" class="form-control" disabled asp-for="@portNum" aria-describedby="basic-addon3">
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-3">
+                    <label asp-for="@rssFeedLink">RSS Feed Link</label>
+                    <input type="text" class="form-control" disabled asp-for="@rssFeedLink" aria-describedby="basic-addon3">
+                </div>
+                <div class="col-3">
+                    <label asp-for="@lookupTerm">Lookup Term</label>
+                    <input type="text" class="form-control" disabled asp-for="@lookupTerm" aria-describedby="basic-addon3">
+                </div>
+                <div class="col-3">
+                    <label asp-for="@checkInterval">Check Interval</label>
+                    <input type="text" class="form-control" disabled asp-for="@checkInterval" aria-describedby="basic-addon3">
+                </div>
+                <div class="col-3">
+                    <label asp-for="@numOfBackup">Number of Back Up</label>
+                    <input type="text" class="form-control" disabled asp-for="@numOfBackup" aria-describedby="basic-addon3">
+                </div>
+                <div class="col-3">
+                    <label asp-for="@addedBy">Added By</label>
+                    <input type="text" class="form-control" disabled asp-for="@addedBy" aria-describedby="basic-addon3">
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-6">
+                    <label asp-for="@description">Description</label>
+                    <div class="form-floating">                  
+                        <textarea class="form-control" disabled placeholder="Leave a comment here" asp-for="@description" style="height: 100px"></textarea>                        
+                    </div>
+                    <br />
+                    <label asp-for="@notificationMsg">Notification Message</label>
+                    <div class="form-floating">
+                        <textarea class="form-control" disabled placeholder="Leave a comment here" asp-for="@notificationMsg" style="height: 100px"></textarea>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="col">
+                        <label asp-for="@dateAdded">Date Added</label>
+                        <input type="text" class="form-control" disabled asp-for="@dateAdded" aria-describedby="basic-addon3">
+                    </div>
+                    <div class="col">
+                        <label asp-for="@lastDateModified">Last Date Modified</label>
+                        <input type="text" class="form-control" disabled asp-for="@lastDateModified" aria-describedby="basic-addon3">
+                    </div>
+                    <br />
+                    <div class="col mt-lg-5">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" asp-for="ServiceDetails.IsActive" disabled>
+                            <label class="form-check-label" asp-for="ServiceDetails.IsActive">Active</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" asp-for="ServiceDetails.IsDeleted" disabled>
+                            <label class="form-check-label" asp-for="ServiceDetails.IsDeleted">Deleted</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" asp-for="ServiceDetails.NotifyByMsteams" disabled>
+                            <label class="form-check-label" asp-for="ServiceDetails.NotifyByMsteams">Notify by MS Teams</label>
+                        </div>
+                    </div>
+                </div>              
+            </div>
+        </div>
+        
+    </div>
+    <hr />
+
+    @{
+        DateTime beginningOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        DateTime currentDate = DateTime.Now;
+        int daysInMonth = DateTime.DaysInMonth(currentDate.Year, currentDate.Month) + 1;
+        string month = beginningOfMonth.ToString("MMMM");
+    }
+
+    <span class="month-name"><b>@month</b></span>
+    <div class="d-flex justify-content-between mt-3">
+        @for (int i = 1; i < daysInMonth; i++)
+        {
+            if (Model.ServiceDetails.ServiceDownHistories.Count() > 0)
+            {
+                foreach (var s in Model.ServiceDetails.ServiceDownHistories)
+                {
+                    DateTime da = s.DateAdded;
+                    bool matchMonth = (s.DateAdded.Month == currentDate.Month);
+                    
+                    int d = (da - beginningOfMonth).Days + 1;
+
+                    if (i == d && matchMonth)
+                    {
+                        int timesDown = Model.ServiceDetails.ServiceDownHistories.Where(x => x.DateAdded.Date == s.DateAdded.Date).ToList().Count;                        
+                        string title = "<div class='times-down-con'><span>Down: " + timesDown + " time(s)</span></div>";
+
+                        <div class="days-down" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="@month @i @title">@i</div>
+                        i++;
+                    }
+                }
+            }
+            
+            if(i <= currentDate.Day)
+            {
+                <div class="days-up" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i">@i</div>
+            }
+            else
+            {
+                <div class="days-future" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i">@i</div>              
+            }          
+        }
+    </div>
+    
+</div>
+
+
+<!-- Edit Status Modal -->
+<div class="modal fade" id="editStatusModal" tabindex="-1" aria-labelledby="editStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editStatusModalLabel">Edit Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <span class="position-absolute top-0 start-100 translate-middle p-2 @bg border border-light rounded-circle" data-bs-toggle="tooltip" data-bs-placement="right" title="Currently @serviceName is @isRunning">
+                    <span class="visually-hidden">New alerts</span>
+                </span>
+            </div>
+            <form method="post" asp-page-handler="EditSatus" asp-route-serviceid="@serviceID">
+                <input hidden asp-for="@Model.ServiceDetails.ServiceName" />
+                <div class="modal-body">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" asp-for="ServiceDetails.IsRunning" data-status="@Model.ServiceDetails.IsRunning.ToString().ToLower()">
+                        <label class="form-check-label" asp-for="ServiceDetails.IsRunning">Down</label>
+                    </div>
+                    <hr />
+                    <div>
+                        <label asp-for="ServiceDetails.NotificationMessage"><b>Notification Message:</b></label>
+                        <br />
+                        <textarea class="form-control" placeholder="Leave a message here" asp-for="ServiceDetails.NotificationMessage" style="height: 100px"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>          
+        </div>
+    </div>
+</div>

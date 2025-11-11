@@ -1,0 +1,304 @@
+﻿@page
+@model VC3EYE.Pages.ServicesListModel
+@using VC3EYE.Data;
+@{
+    ViewData["Title"] = "Services";
+
+    string? locationQuery = Request.Query["location"];
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"]</title>
+</head>
+<body>
+    <partial name="_Message" />
+    <div class=" mt-3 ">
+        <h1>Services</h1>
+    </div>
+    <hr />
+    <div class="container-fluid align-content-center mt-lg-5">
+        <div class="row d-flex justify-content-between">
+            <div class="col-md-6">
+                <form method="post" class="form-inline d-flex bd-highlight" asp-page-handler="Search">
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="Search..." name="searchTerm" asp-for="searchTerm" value="">
+                        <div class="input-group-append">
+                            <button class="btn btn-secondary" type="submit">
+                                <div class="bi bi-search"></div>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group col-md-4 mx-lg-5">
+                        <div class="dropdown">
+                            <a class="btn btn-secondary dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
+                                Location <i class="bi bi-geo-alt"></i>
+                            </a>
+
+                            <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink">
+                                @if (Model.LocationName != null)
+                                {
+                                    @foreach (var location in Model.LocationName)
+                                    {
+                                        <li><a class="dropdown-item" href="?location=@location.ToLower()">@location.ToUpper()</a></li>
+                                    }
+                                }
+
+                            </ul>
+                        </div>
+                    </div>
+                </form>
+               
+
+            </div>
+            @if (User.IsInRole(SiteRoles.Administrator) || User.IsInRole(SiteRoles.User))
+            {
+                <div class="row col-sm-2 d-flex justify-content-end">
+                    <a class="btn btn-success" asp-page="/AddService">Add Service <i class="bi bi-plus-circle"></i></a>
+                </div>
+            }
+            <span asp-validation-for="searchTerm" class="text-danger"></span>
+        </div>
+    </div>
+
+    <div class="container-fluid mt-lg-5">
+        @if (!string.IsNullOrEmpty(locationQuery))
+        {
+            <h4><span class="badge bg-dark">Results for @locationQuery.ToUpper()</span></h4>
+        }
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">Name Of Service <i class="bi bi-info-square"></i></th>
+                    <th scope="col">Date Added <i class="bi bi-calendar-plus"></i></th>
+                    <th scope="col">IP Address <i class="bi bi-hdd-network"></i></th>
+                    <th scope="col">Status <i class="bi bi-activity"></i></th>
+                    <th scope="col">ICMP Result <i class="bi bi-check2"></i></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.services != null)
+                {
+                    @if (Model.services != null && Model.services.Any())
+                    {
+                        foreach (var service in Model.services)
+                        {
+                            if (!service.IsDeleted)
+                            {
+                                string status = service.IsRunning ? "Running" : "Down";
+                                string icmpStatus = (!string.IsNullOrEmpty(service.Ipaddress) && service.IsIcmpRunning) ? "Reachable" : "Not Reachable";
+                                string ip = service.Ipaddress == null ? "N/A" : service.Ipaddress;
+                                <tr class="services-table  @status.ToLower()">
+                                    <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a></td>
+                                    <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.DateAdded</a></td>
+                                    <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@ip</a></td>
+                                    <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId"> <span class="badge @((status == "Down") ? "bg-danger" : "bg-success")">@status</span></a></td>
+                                    <td>
+                                        <a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">
+                                            <span class="badge @((icmpStatus == "Not Reachable") ? "bg-danger" : "bg-success")">@icmpStatus</span>
+                                        </a>
+                                    </td>
+                                    @if (User.IsInRole(SiteRoles.Administrator) || User.IsInRole(SiteRoles.User))
+                                    {
+                                        <td class="d-flex flex-row">
+                                            <form method="post" asp-page="/ServicesList" asp-page-handler="Delete" asp-route-serviceid="@service.ServiceId">
+                                                @{
+                                                    Model.serviceName = service.ServiceName;
+                                                }
+                                                <input hidden asp-for="@Model.serviceName" />
+                                                <a asp-page="/EditService" asp-route-serviceid="@service.ServiceId" class="btn btn-sm btn-secondary"><i class="bi bi-pencil-square"></i> Edit</a>
+                                                <button class="btn btn-sm btn-danger" type="submit" onclick="return confirmDelete()"> <i class="bi bi-trash3"></i> Delete</button>
+                                            </form>
+                                            <form method="post" asp-page-handler="Check" asp-route-serviceid="@service.ServiceId">
+                                                <button type="submit" id="btnCheck" value="Check" asp-route-serviceid="@service.ServiceId" asp-page-handler="Check" class="btn btn-sm btn-warning ms-1"><i class="bi bi-check-square"></i> Check</button>
+                                            </form>
+
+                                            <form method="post" asp-page-handler="Lookup" asp-route-serviceid="@service.ServiceId">
+                                                <button type="submit" id="btnLookup" value="Lookup" asp-route-serviceid="@service.ServiceId" asp-page-handler="Lookup" class="btn btn-sm btn-info ms-1"><i class="bi bi-check-square"></i> Lookup</button>
+                                            </form>
+                                        </td>
+                                    }
+
+                                </tr>
+                            }
+
+                        }
+                    }
+                    else
+                    {
+                        <tr class="alert alert-warning text-center fw-bold" role="alert">
+                            <td colspan="6">No Results <i class="bi bi-exclamation-triangle"></i></td>
+                        </tr>
+                    }
+                }
+
+            </tbody>
+        </table>
+
+    </div>
+    @if (User.IsInRole(SiteRoles.Administrator) || User.IsInRole(SiteRoles.User))
+    {
+        @if (Model.PausedServices != null && Model.PausedServices.Count() > 0)
+        {
+            <hr />
+            <div class="container-fluid align-content-center">
+                <div class="accordion" id="accordionExample1">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingTwo1">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo1" aria-expanded="false" aria-controls="collapseTwo">
+                                <h5>Paused Services <span class="badge badge-primary count-deleted">@Model.PausedServices?.Count()</span></h5>
+                            </button>
+                        </h2>
+                        <div id="collapseTwo1" class="accordion-collapse collapse" aria-labelledby="headingTwo1" data-bs-parent="#accordionExample1">
+                            <div class="accordion-body">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Name Of Service <i class="bi bi-info-square"></i></th>
+                                            <th scope="col">Date Added <i class="bi bi-calendar-plus"></i></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (Model.PausedServices != null)
+                                        {
+                                            @if (Model.PausedServices != null && Model.PausedServices.Any())
+                                            {
+                                                foreach (var service in Model.PausedServices)
+                                                {
+                                                    string paused = service.IsActive ? "not-paused" : "paused";
+
+                                                    <tr class="services-table @paused.ToLower()">
+                                                        <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a></td>
+                                                        <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.DateAdded</a></td>
+
+                                                        <td>
+                                                            <form>
+                                                                @{
+                                                                    Model.serviceName = service.ServiceName;
+                                                                }
+                                                                <input hidden asp-for="@Model.serviceName" />
+                                                                <a asp-page="/EditService" asp-route-serviceid="@service.ServiceId" class="btn btn-sm btn-secondary"><i class="bi bi-pencil-square"></i> Edit</a>
+                                                            </form>
+
+                                                        </td>
+                                                    </tr>
+
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <tr class="alert alert-warning text-center fw-bold" role="alert">
+                                                    <td colspan="6">No Results <i class="bi bi-exclamation-triangle"></i></td>
+                                                </tr>
+                                            }
+                                        }
+
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (Model.DeletedServices != null && Model.DeletedServices.Count() > 0)
+        {
+            <hr />
+            <div class="container-fluid align-content-center">
+                <div class="accordion" id="accordionExample2">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingTwo">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                <h5>Deleted Services <span class="badge badge-primary count-deleted">@Model.DeletedServices?.Count()</span></h5>
+                            </button>
+                        </h2>
+                        <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#accordionExample2">
+                            <div class="accordion-body">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Name Of Service <i class="bi bi-info-square"></i></th>
+                                            <th scope="col">Date Added <i class="bi bi-calendar-plus"></i></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (Model.DeletedServices != null)
+                                        {
+                                            @if (Model.DeletedServices != null && Model.DeletedServices.Any())
+                                            {
+                                                foreach (var service in Model.DeletedServices)
+                                                {
+
+
+                                                    string status = service.IsRunning ? "Running" : "Down";
+                                                    string deleted = service.IsDeleted ? "Deleted" : "Not-Deleted";
+
+                                                    <tr class="services-table @deleted.ToLower()">
+                                                        <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a></td>
+                                                        <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.DateAdded</a></td>
+
+                                                        <td class="d-flex flex-row">
+                                                            <form>
+                                                                @{
+                                                                    Model.serviceName = service.ServiceName;
+                                                                }
+                                                                <input hidden asp-for="@Model.serviceName" />
+
+
+
+
+                                                            </form>
+                                                            <button type="button" class="btn btn-sm btn-danger ms-1" id="delete-ser-@service.ServiceId" data-name="@service.ServiceName" asp-route-serviceid="@service.ServiceId" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                                                <i class="bi bi-trash3"></i> Delete Permanently
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+
+
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <tr class="alert alert-warning text-center fw-bold" role="alert">
+                                                    <td colspan="6">No Results <i class="bi bi-exclamation-triangle"></i></td>
+                                                </tr>
+                                            }
+                                        }
+
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+        }
+    }
+
+
+    <!-- Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel"><i class="bi bi-exclamation-octagon-fill"></i> Danger Zone</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to permanently delete <b class="service-title"></b> ?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <form method="post" asp-page-handler="DeletePermanently">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

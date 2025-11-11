@@ -1,0 +1,112 @@
+﻿@page
+@model VC3EYE.Pages.EditServiceModel
+@{
+    int serviceID = Model.Service.ServiceID;
+
+    //string disabled = (!Model.Service.IsActive && Model.Service.IsDeleted) ? "disabled" : "none";
+
+    ViewData["Title"] = "Edit Service";
+}
+
+<div class="container-fluid mt-3">
+    <h1>Edit @Model.Service.ServiceName</h1>
+    <hr />
+    <partial name="_Message" />
+    @if (!Model.Service.IsDeleted)
+    {
+        <form method="post" asp-page-handler="Edit" asp-route-serviceid="@serviceID">
+            <div class="row">
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.ServiceName"><b>Service Name</b></label>
+                    <input type="text" asp-for="Service.ServiceName" class="form-control" />
+                    <span asp-validation-for="Service.ServiceName" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.ServiceURL"><b>Service URL</b></label>
+                    <input type="text" asp-for="Service.ServiceURL" class="form-control" />
+                    <span asp-validation-for="Service.ServiceURL" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.Location"><b>Location</b></label>
+                    <input type="text" asp-for="Service.Location" class="form-control" />
+                    <span asp-validation-for="Service.Location" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.IPAddress"><b>IP Address</b></label>
+                    <input type="text" asp-for="Service.IPAddress" class="form-control" />
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.GeneralInformation"><b>Description</b></label>
+                    <div class="form-floating">
+                        <textarea class="form-control" placeholder="Leave a comment here" asp-for="Service.GeneralInformation" style="height: 100px"></textarea>
+                    </div>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.Port"><b>Port</b></label>
+                    <input type="number" asp-for="Service.Port" class="form-control" />
+                    <span asp-validation-for="Service.Port" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.RSSFeedLink"><b>RSS Feed Link</b></label>
+                    <input type="text" asp-for="Service.RSSFeedLink" class="form-control" />
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.LookupTerm"><b>Lookup Term</b></label>
+                    <input type="text" asp-for="Service.LookupTerm" class="form-control" />
+                    <span asp-validation-for="Service.LookupTerm" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.CheckInterval"><b>Check Interval (mins)</b></label>
+                    <input type="text" asp-for="Service.CheckInterval" class="form-control" />
+                    <span asp-validation-for="Service.CheckInterval" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.NumOfBackup"><b>Number of Backup(s)</b></label>
+                    <input type="number" asp-for="Service.NumOfBackup" class="form-control" />
+                </div>
+                <div class="col-sm-6 form-check mt-4">
+                    <div class="row">
+                        <div class="col-2">
+                            <div class="service-important-chkbox">
+                                <input type="checkbox" class="form-check-input" asp-for="Service.IsImportant" />
+                                <label class="form-check-label" asp-for="Service.IsImportant">
+                                    Important
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div class="service-important-chkbox">
+                                <input type="checkbox" class="form-check-input" asp-for="Service.IsInternal" />
+                                <label class="form-check-label" asp-for="Service.IsInternal">
+                                    Internal
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="service-important-chkbox">
+                                <input type="checkbox" class="form-check-input" asp-for="Service.NotifyByMSTeams" />
+                                <label class="form-check-label" asp-for="Service.NotifyByMSTeams">
+                                    Notify By MS Teams
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="Service.NotificationMessage"><b>Notification Message</b></label>
+                    <div class="form-floating">
+                        <textarea class="form-control" placeholder="Leave a comment here" asp-for="Service.NotificationMessage" style="height: 100px"></textarea>
+                    </div>
+                </div>
+            </div>
+            <a asp-page="/ServiceInfo" asp-route-serviceid="@serviceID" class="btn btn-primary m-1"> Go Back <i class="bi bi-backspace-fill"></i></a>
+            <button type="submit" class="btn btn-success">Update <i class="bi bi-pencil-square"></i></button>
+        </form>
+    }
+    else
+    {
+        <div class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> Cannot edit deleted service!
+        </div>
+    }
+</div>

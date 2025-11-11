@@ -1,0 +1,35 @@
+﻿@page
+@model VC3EYE.Pages.ErrorLogsModel
+@{
+    ViewData["Title"] = "Error Logs";
+}
+
+<div class="container-fluid mt-3">
+    <div class="jd-flex justify-content-between d-flex align-items-center">
+        <h1>Error Logs</h1>
+        <h4><span class="badge bg-secondary">Total: @Model.TotalErrorLogs</span></h4>
+    </div>   
+    <hr />
+    @if(Model.ErrorLogs != null && Model.ErrorLogs.Count() > 0)
+    {
+        <table class="table table-hover error-logs-table">
+            <thead>
+                <tr>
+                    <th scope="col">Error Name</th>
+                    <th scope="col">Error Description</th>
+                    <th scope="col">Date Added</th>                 
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Model.ErrorLogs)
+                {                  
+                    <tr class="error-log">
+                        <th>@l.ErrorName</th>
+                        <td><span>@l.ErrorDescription</span></td>
+                        <td>@l.DateAdded.ToString("dddd, dd MMMM yyyy h:mm tt")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>

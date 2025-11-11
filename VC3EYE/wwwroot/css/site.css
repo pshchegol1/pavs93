@@ -1,0 +1,183 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+/*body {
+  margin-bottom: 60px;
+}*/
+
+.service-important-chkbox{
+    margin-left: 1rem;
+}
+
+#page-content-wrapper nav.navbar {
+    height: 75.5px;
+}
+
+.service-info-con .running-status.running {
+    background-color: #49e96e !important;
+}
+
+.service-info-con .running-status.down {
+    background-color: #e95f49 !important;
+}
+
+.service-info-con .running-status.paused {
+    background-color: #fff700 !important;
+}
+
+.service-info-con .running-status.deleted {
+    background-color: red !important;
+}
+
+.service-info-con input,
+.service-info-con textarea {
+    font-weight: bold;
+}
+
+.services-table.down {
+    background-color: #FAA18F !important;
+}
+
+.services-table.running {
+    background-color: #B6FFA1 !important;
+}
+
+.services-table td a {
+    text-decoration: none;
+    font-weight: bold;
+}
+
+footer .footer-con{
+    padding: 10px;
+}
+
+.services-table.deleted {
+    background-color: #F8F8FF !important;
+}
+
+.services-table.not-deleted {
+    background-color: #7edd947a !important;
+}
+
+
+.count-deleted {
+    background-color: #4169E1;
+}
+
+.services-table.not-paused {
+    background-color: #7edd947a !important;
+}
+
+.services-table.paused {
+    background-color: #FFFACD !important;
+}
+
+.list-group b i::before {
+    font-weight: bold !important;
+}
+
+#deleteModal .modal-content {
+    border-color: red;
+}
+
+#deleteModal .modal-header,
+#deleteModal .modal-body, 
+#deleteModal .modal-footer {
+    background: #ff00001a;
+}
+
+.error-logs-table tbody td:nth-child(2) {
+    width: 50%;
+}
+
+.card.services-up span,
+.card.services-down span {
+    font-size: 2rem;
+}
+
+.card.services-up {
+    background: #9ae09a;
+    box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+}
+
+.card.services-down {
+    background: #f59696;
+    box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+}
+
+.days-up,
+.days-down,
+.days-future {
+    cursor: pointer;
+    transition: transform .3s ease;
+}
+
+.days-up {
+    background: #9ae09a;
+    width: 100%;
+    border: 1px solid;
+    text-align: center;
+    border-radius: 10px;
+}
+
+.days-down {
+    background: #f59696;
+    width: 100%;
+    border: 1px solid;
+    text-align: center;
+    border-radius: 10px;
+}
+
+.days-future {
+    background: #c7c2c2;
+    width: 100%;
+    border: 1px solid;
+    text-align: center;
+    border-radius: 10px;
+}
+
+.month-name {
+    text-transform: uppercase;
+    font-size: 2rem;
+}
+
+.days-up:hover,
+.days-down:hover,
+.days-future:hover {
+    transform: scale(1.2);
+}
+
+.mobile-logout {
+    display: flex;
+    align-items: center;
+}
+
+.mobile-logout i {
+    padding-left: 10px;
+}
+
+.main-down-history .days-up,
+.main-down-history .days-down,
+.main-down-history .days-future {
+    width: 9px;
+    height: 15px;
+    border-radius: 4px;
+}
+
+@media only screen and (max-width:991px) {
+    .main-table-content {
+        margin-top: 1.8rem;
+    }
+}

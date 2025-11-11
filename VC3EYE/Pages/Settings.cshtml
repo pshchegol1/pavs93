@@ -1,0 +1,44 @@
+﻿@page
+@model VC3EYE.Pages.SettingsModel
+@{
+    ViewData["Title"] = "Settings";
+
+    int settingid = (Model.Setting != null) ? @Model.Setting.SettingId : 0;
+}
+
+<form method="post" asp-page-handler="Save" asp-route-settingid="@settingid">
+    <div class=" mt-3 ">
+        <h1>Settings</h1>
+    </div>
+    <hr />
+    <div class="border p-3 mt-4">
+        <div asp-validation-summary="All"></div>
+        
+
+        <div class="mb-3">
+            <label asp-for="Setting.SmtpPort"></label>
+            <input asp-for="@Model.Setting.SmtpPort" class="form-control">
+        </div>
+        <div class="mb-3">
+            <label asp-for="Setting.SmtpUserName"></label>
+            <input asp-for="@Model.Setting.SmtpUserName" class="form-control">
+        </div>
+        <div class="mb-3">
+            <label asp-for="Setting.SmtpPassword"></label>
+            <input type="password" asp-for="@Model.Setting.SmtpPassword" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label asp-for="Setting.MtClientId"></label>
+            <input asp-for="@Model.Setting.MtClientId" class="form-control" />
+            <span asp-validation-for="Setting.MtClientId" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="Setting.MtSecretKey"></label>
+            <input asp-for="@Model.Setting.MtSecretKey" class="form-control" />
+        </div>          
+        <div>
+            <button type="submit" class="btn btn-primary" style="width:150px;">Save</button>
+        </div>
+    </div>
+    </form>
+@Model.Message

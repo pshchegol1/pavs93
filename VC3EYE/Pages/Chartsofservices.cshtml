@@ -1,0 +1,37 @@
+﻿@page
+@model VC3EYE.Pages.ChartsofservicesModel
+@{
+    ViewData["Tittle"] = "Service Down History";
+
+}
+<canvas id="salesChart" width="400" height="200"></canvas>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.5.0/dist/chart.min.js"></script>
+    <script>
+        var salesData = {
+            labels: @Json.Serialize(Model.Months),
+            datasets: [{
+                label: 'ServiceDown',
+                data: @Json.Serialize(Model.Down ),
+                borderColor: 'rgb(255, 99, 132)',
+                tension: 0.1
+            }]
+        };
+        var chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        };
+
+        var salesChart = new Chart(document.getElementById('salesChart').getContext('2d'), {
+            type: 'line',
+            data: salesData,
+            options: chartOptions
+        });
+    </script>
+}

@@ -1,0 +1,46 @@
+﻿@{
+    string msg = Context.Request.Query["m"];
+}
+
+@if (!string.IsNullOrEmpty(msg))
+{
+    if (msg == "updated")
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <strong><i class="bi bi-check-circle-fill"></i></strong> Service successfully updated.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    if (msg == "upfailed")
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong><i class="bi bi-exclamation-circle-fill"></i></strong> Service update failed.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    if (msg == "deleted")
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <strong><i class="bi bi-check-circle-fill"></i></strong> Service Deleted.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    if (msg == "checked")
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <strong><i class="bi bi-check-circle-fill"></i></strong> Service Checked.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    if (msg == "termchecked")
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <strong><i class="bi bi-check-circle-fill"></i></strong> Service Keyword Checked.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+}

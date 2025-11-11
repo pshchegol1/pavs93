@@ -1,0 +1,96 @@
+﻿@page
+@model VC3EYE.Pages.LogsModel
+@{
+    ViewData["Title"] = "Logs";
+
+    int currentPage = Convert.ToInt32(Request.Query["p"]) == 0 ? 1 : Convert.ToInt32(Request.Query["p"]);
+}
+
+<div class="container-fluid mt-3">
+    <div class="jd-flex justify-content-between d-flex align-items-center">
+        <h1>Change Logs</h1>
+        <h4><span class="badge bg-secondary">Total: @Model.TotalLogs</span></h4>
+    </div>
+   
+    <hr>
+    @if(Model.SiteLogs != null && Model.SiteLogs.Count() > 0)
+    {
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">Log Name</th>
+                    <th scope="col">Log Description</th>
+                    <th scope="col">Date Added</th>
+                    <th scope="col">User Name</th>
+                   @* <th scope="col">Audit</th>*@
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(var l in Model.SiteLogs)
+                {
+                    string userName = l.User.FirstName + " " + l.User.LastName;
+                    string dateAdded = l.DateAdded.ToString("dddd, dd MMMM yyyy h:mm tt");
+
+                    <tr>
+                        <th>@l.LogName</th>
+                        <td>@l.LogDescription</td>
+                        <td>@dateAdded</td>
+                        <td>@userName</td>
+                        @*<td>
+                            @if (l.IsAudit)
+                            {
+                                <i class="bi bi-check-lg"></i>
+                            }
+                            else
+                            {
+                                <i class="bi bi-x-lg"></i>
+                            }
+                        </td>*@
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if(Model.NumOfPages > 1)
+        {
+            int prev = currentPage - 1;
+            int next = currentPage + 1;
+
+            int lowestPage = (currentPage >= 3) ? (currentPage - 2) : 1;
+            int highestPage = currentPage + 3 <= Model.NumOfPages ? currentPage + 2 : Model.NumOfPages;
+
+            <nav aria-label="Logs page navigation">
+                <ul class="pagination justify-content-end">
+                    @if(currentPage > 1)
+                    {                                             
+                        <li class="page-item">
+                            <a class="page-link" aria-label="Previous" asp-page="/Logs" asp-route-p="@prev">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                    }
+                    @for (int i = lowestPage; i <= highestPage; i++)
+                    {
+                        string activePage = currentPage == i ? "active" : "";
+
+                        <li class="page-item @activePage"><a asp-page="/Logs" asp-route-p="@i" class="page-link">@i</a></li>
+                    }
+                    @if(currentPage != Model.NumOfPages)
+                    {                       
+                        <li class="page-item">
+                            <a class="page-link" aria-label="Next" asp-page="/Logs" asp-route-p="@next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </nav>
+        }
+    }
+    else
+    {
+        <div class="alert alert-warning text-center fw-bold" role="alert">
+            <div colspan="4">No Logs <i class="bi bi-exclamation-triangle"></i></div>
+        </div>
+    }
+</div>

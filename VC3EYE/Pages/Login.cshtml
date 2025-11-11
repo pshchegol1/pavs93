@@ -1,0 +1,36 @@
+﻿@page
+@model VC3EYE.Pages.LoginModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+<div class="vh-100 d-flex justify-content-center align-items-center">
+    <div class="container">
+        <div class="row d-flex justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6">
+                <div class="card bg-white">
+                    <div class="card-body p-5">
+                        <form method="post" class="mb-3 mt-md-4">
+                            <h2 class="fw-bold mb-2 text-uppercase "><i class="bi bi-eye-fill"></i> VC3EYE</h2>
+                            <p class=" mb-5">Please enter your login and password!</p>
+                            <span asp-validation-for="Login.LoginError" class="text-danger"></span>
+                            <div class="mb-3">
+                                <label asp-for="Login.Email"><b>Email</b></label>
+                                <input type="email" asp-for="Login.Email" class="form-control" placeholder="Email" />
+                                <span asp-validation-for="Login.Email" class="text-danger"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="Login.Password"><b>Password</b></label>
+                                <input type="password" asp-for="Login.Password" class="form-control" placeholder="Password" />
+                                <span asp-validation-for="Login.Password" class="text-danger"></span>
+                            </div>                         
+                            <div class="d-grid">
+                                <button class="btn btn-outline-dark" type="submit">Login</button>
+                            </div>
+                        </form>                      
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,87 @@
+﻿@page
+@model VC3EYE.Pages.AddServiceModel
+@{
+    ViewData["Title"] = "Add Service";
+}
+
+@*JavaScript pop-up*@
+<input type="hidden" id="message" value="@Model.Message" />
+
+<script>
+    function showMessage() {
+        var message = document.getElementById("message").value;
+        alert(message);
+    }
+
+//document.getElementById("btnAdd").addEventListener("click", showMessage);
+</script>
+
+<div class="border-1 container-fluid mt-4">
+    <h1>Add Service</h1>
+
+    <hr />
+
+    <form method="post">
+        <div class="form-container">
+            <div class="row">
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.ServiceName"><b>Service Name</b></label>
+                    <input type="text" asp-for="currentService.ServiceName" class="form-control" />
+                    <span asp-validation-for="currentService.ServiceName" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.ServiceURL"><b>Service URL</b></label>
+                    <input type="text" asp-for="currentService.ServiceURL" class="form-control" />
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.Location"><b>Location</b></label>
+                    <input type="text" asp-for="currentService.Location" class="form-control" />
+                    <span asp-validation-for="currentService.Location" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.IPAddress"><b>IP Address</b></label>
+                    <input type="text" asp-for="currentService.IPAddress" class="form-control" />
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.GeneralInformation"><b>General Information</b></label>
+                    <input type="text" asp-for="currentService.GeneralInformation" class="form-control" />
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.Port"><b>Port</b></label>
+                    <input type="number" asp-for="currentService.Port" class="form-control" />
+                    <span asp-validation-for="currentService.Port" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.RSSFeedLink"><b>RSS Feed Link</b></label>
+                    <input type="text" asp-for="currentService.RSSFeedLink" class="form-control" />
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.LookupTerm"><b>Lookup Term</b></label>
+                    <input type="text" asp-for="currentService.LookupTerm" class="form-control" />
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.CheckInterval"><b>Check Interval (mins)</b></label>
+                    <input type="text" asp-for="currentService.CheckInterval" class="form-control" />
+                    <span asp-validation-for="currentService.CheckInterval" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6 mb-3">
+                    <label asp-for="currentService.NumOfBackup"><b>Number of Backup(s)</b></label>
+                    <input type="number" asp-for="currentService.NumOfBackup" class="form-control" />
+                </div>
+                <div class="col-sm-6 form-check mt-4">
+                    <div class="service-important-chkbox">
+                        <input type="checkbox" class="form-check-input" asp-for="currentService.IsImportant" />
+                        <label class="form-check-label" asp-for="currentService.IsImportant">
+                            Important
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <button type="submit" id="btnBack" value="GoBack" asp-page-handler="GoBack" class="btn btn-primary mb-3 ml-3">Go Back <i class="bi bi-backspace-fill"></i></button>
+
+            <button type="submit" id="btnAdd" value="Add" asp-page-handler="Add" class="btn btn-success mb-3 ml-3">Add <i class="bi bi-plus-circle"></i></button>
+        </div>
+    </form>
+</div>
+
+@Html.Raw(ViewData["Script"])
