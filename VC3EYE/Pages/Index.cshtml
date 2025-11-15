@@ -94,7 +94,25 @@
                                 <tr class="services-table table-success">
                                     <td>
                                         <a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a>
-                                        <br> <span class="badge badge-success">Running</span>
+                                        <br>
+                                        @if (service.IsRunning)
+                                        {
+                                            <span class="badge bg-success" data-bs-toggle="tooltip" title="Service is running">
+                                                <i class="bi bi-check-circle-fill"></i> Running
+                                            </span>
+                                        }
+                                        else if (service.IsDeleted)
+                                        {
+                                            <span class="badge bg-secondary" data-bs-toggle="tooltip" title="Service is deleted">
+                                                <i class="bi bi-x-circle-fill"></i> Deleted
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger" data-bs-toggle="tooltip" title="Service is down">
+                                                <i class="bi bi-exclamation-triangle-fill"></i> Down
+                                            </span>
+                                        }
                                         <div class="main-down-history d-flex justify-content-between mt-3">
                                             @for (int i = 1; i < daysInMonth; i++)
                                             {
@@ -176,10 +194,29 @@
                             {
                                 <tr class="services-table table-danger">
                                     <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a>
-                                        <br> <span class="badge badge-danger">Down</span>
+                                        <br>
+                                        @if (service.IsRunning)
+                                        {
+                                            <span class="badge bg-success" data-bs-toggle="tooltip" title="Service is running">
+                                                <i class="bi bi-check-circle-fill"></i> Running
+                                            </span>
+                                        }
+                                        else if (service.IsDeleted)
+                                        {
+                                            <span class="badge bg-secondary" data-bs-toggle="tooltip" title="Service is deleted">
+                                                <i class="bi bi-x-circle-fill"></i> Deleted
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger" data-bs-toggle="tooltip" title="Service is down">
+                                                <i class="bi bi-exclamation-triangle-fill"></i> Down
+                                            </span>
+                                        }
                                         <div class="main-down-history d-flex justify-content-between mt-3">
                                             @for (int i = 1; i < daysInMonth; i++)
                                             {
+                                                bool isDayDown = false;
                                                 if (service.ServiceDownHistories != null && service.ServiceDownHistories.Count() > 0)
                                                 {
                                                     foreach (var down in service.ServiceDownHistories)
@@ -193,19 +230,23 @@
                                                             int timesDown = service.ServiceDownHistories.Where(x => x.DateAdded.Date == down.DateAdded.Date).ToList().Count;
                                                             string title = "<div class='times-down-con'><span>Down: " + timesDown + " time(s)</span></div>";
 
-                                                            <div class="days-down" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="@month @i @title"></div>
-                                                            i++;
+                                                            <div class="days-down bg-danger" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="@month @i @title"></div>
+                                                            isDayDown = true;
+                                                            break;
                                                         }
                                                     }
                                                 }
 
-                                                if (i <= currentDate.Day)
+                                                if (!isDayDown)
                                                 {
-                                                    <div class="days-up" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
-                                                }
-                                                else
-                                                {
-                                                    <div class="days-future" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
+                                                    if (i <= currentDate.Day)
+                                                    {
+                                                        <div class="days-up" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="days-future" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
+                                                    }
                                                 }
                                             }
                                         </div>
