@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="ServicesThread.cs" />
+  </Folder>
+  <Project Path="LoginDashboardApp.csproj" />
+</Solution>

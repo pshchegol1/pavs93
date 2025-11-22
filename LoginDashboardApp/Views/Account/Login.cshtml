@@ -1,0 +1,89 @@
+﻿@model LoginViewModel
+@{
+    ViewData["Title"] = "Login";
+    Layout = "_Layout";
+}
+
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div class="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+            <!-- Header -->
+            <div class="text-center">
+                <div class="mx-auto h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center">
+                    <i class="fas fa-sign-in-alt text-white text-xl"></i>
+                </div>
+                <h2 class="mt-6 text-3xl font-bold text-gray-900">Sign in to your account</h2>
+                <p class="mt-2 text-sm text-gray-600">
+                    Use demo credentials: user@example.com / password
+                </p>
+            </div>
+
+            <!-- Login Form -->
+            <form class="mt-8 space-y-6" asp-action="Login" method="post">
+                @Html.AntiForgeryToken()
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                        @Html.ValidationSummary(true)
+                    </div>
+                }
+
+                <div class="space-y-4">
+                    <!-- Email Input -->
+                    <div>
+                        <label asp-for="Email" class="sr-only">Email address</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-envelope text-gray-400"></i>
+                            </div>
+                            <input asp-for="Email" type="email" class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" placeholder="Email address" />
+                        </div>
+                        <span asp-validation-for="Email" class="text-red-600 text-sm"></span>
+                    </div>
+
+                    <!-- Password Input -->
+                    <div>
+                        <label asp-for="Password" class="sr-only">Password</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                            <input asp-for="Password" type="password" class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" placeholder="Password" />
+                        </div>
+                        <span asp-validation-for="Password" class="text-red-600 text-sm"></span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <input asp-for="RememberMe" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" />
+                        <label asp-for="RememberMe" class="ml-2 block text-sm text-gray-900">
+                            Remember me
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div>
+                    <button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        <i class="fas fa-sign-in-alt mr-2"></i>Sign in
+                    </button>
+                </div>
+
+                <!-- Demo Credentials -->
+                <div class="text-center">
+                    <p class="text-xs text-gray-500">
+                        Demo credentials:<br />
+                        Email: user@example.com<br />
+                        Password: password
+                    </p>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
