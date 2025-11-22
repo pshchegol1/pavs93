@@ -93,10 +93,34 @@
                                     <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a></td>
                                     <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.DateAdded</a></td>
                                     <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@ip</a></td>
-                                    <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId"> <span class="badge @((status == "Down") ? "bg-danger" : "bg-success")">@status</span></a></td>
                                     <td>
                                         <a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">
-                                            <span class="badge @((icmpStatus == "Not Reachable") ? "bg-danger" : "bg-success")">@icmpStatus</span>
+                                            <span class="badge @((status == "Down") ? "bg-danger" : "bg-success")">
+                                                @status
+                                                @if (status == "Down")
+                                                {
+                                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                }
+                                            </span>
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">
+                                            <span class="badge @((icmpStatus == "Not Reachable") ? "bg-danger" : "bg-success")">
+                                                @icmpStatus
+                                                @if (icmpStatus == "Not Reachable")
+                                                {
+                                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                }
+                                            </span>
                                         </a>
                                     </td>
                                     @if (User.IsInRole(SiteRoles.Administrator) || User.IsInRole(SiteRoles.User))

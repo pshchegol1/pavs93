@@ -256,15 +256,15 @@
                                         @service.LastTimeChecked
                                     </td>
 
-                                    @if (service.ServiceDownHistories.Count != 0)
+                                    @* In the downed service row, update the check for ServiceDownHistories.Count *@
+                                    @if (service.ServiceDownHistories != null && service.ServiceDownHistories.Count != 0)
                                     {
                                         <td>
-                                            Last time Running:<br>
+                                            Last time Down:<br>
                                             @service.ServiceDownHistories.Last().DateAdded
                                         </td>
-
                                         <td>
-                                            Last time since Running:<br>
+                                            Last time since Down:<br>
                                             @{
                                                 time = (DateTime.Now - service.ServiceDownHistories.Last().DateAdded);
                                             }
