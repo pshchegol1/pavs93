@@ -1,5 +1,6 @@
 ﻿using LoginDashboardApp.Data;
 using LoginDashboardApp.Models;
+using LoginDashboardApp.BLL;
 
 namespace LoginDashboardApp.Controllers
 {

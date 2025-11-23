@@ -7,6 +7,7 @@
         public DateTime LoginTime { get; set; }
         public DashboardStats Stats { get; set; } = new DashboardStats();
         public List<string> RecentActivities { get; set; } = new List<string>();
+        public List<ServiceModel> Services { get; set; } = new List<ServiceModel>();
     }
 
     public class DashboardStats

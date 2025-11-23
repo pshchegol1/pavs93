@@ -1,7 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using LoginDashboardApp.Models;
+using LoginDashboardApp.Data;
 
-namespace LoginDashboardApp.Data
+namespace LoginDashboardApp.BLL
 {
     public class UsersManager
     {

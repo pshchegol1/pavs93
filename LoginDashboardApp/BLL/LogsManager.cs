@@ -1,7 +1,8 @@
-﻿using LoginDashboardApp.Models;
+﻿using LoginDashboardApp.Data;
+using LoginDashboardApp.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace LoginDashboardApp.Data
+namespace LoginDashboardApp.BLL
 {
     public class LogsManager
     {

@@ -1,6 +1,7 @@
-﻿using LoginDashboardApp.Models;
+﻿using LoginDashboardApp.Data;
+using LoginDashboardApp.Models;
 
-namespace LoginDashboardApp.Data
+namespace LoginDashboardApp.BLL
 {
     public class ServiceDownHistoryManager
     {

@@ -1,4 +1,5 @@
-﻿using LoginDashboardApp.Data;
+﻿using LoginDashboardApp.BLL;
+using LoginDashboardApp.Data;
 using LoginDashboardApp.Models;
 
 namespace LoginDashboardApp

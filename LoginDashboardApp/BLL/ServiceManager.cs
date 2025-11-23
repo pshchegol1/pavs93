@@ -7,8 +7,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using LoginDashboardApp.Models;
+using LoginDashboardApp.Data;
 
-namespace LoginDashboardApp.Data
+namespace LoginDashboardApp.BLL
 {
     public class ServiceManager
     {
