@@ -1,27 +1,27 @@
 /* Custom styles can be added here */
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', sans-serif !important;
 }
 
 /* Smooth transitions */
 * {
-    transition: all 0.2s ease-in-out;
+    transition: all 0.2s ease-in-out !important;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-    width: 6px;
+    width: 6px !important;
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: #f1f1f1 !important;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
+    background: #c1c1c1 !important;
+    border-radius: 3px !important;
 }
 
     ::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8;
+        background: #a8a8a8 !important;
     }
