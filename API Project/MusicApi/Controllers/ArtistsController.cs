@@ -30,6 +30,7 @@ namespace MusicApi.Controllers
 
         }
 
+        // api/artists
         [HttpGet]
         public async Task <IActionResult> GetArtists()
         {
@@ -37,7 +38,7 @@ namespace MusicApi.Controllers
             select new
             {
                 Id = artist.Id,
-                Name = artist.Name,
+                ArtistName = artist.Name,
                 ImageUrl = artist.ImageUrl,
                 
             }).ToListAsync();
