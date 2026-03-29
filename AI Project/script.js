@@ -66,11 +66,29 @@ function addInputListeners() {
 }
 
 function exportChart() {
-    if (!chart) return;
+    if (!chart) {
+        alert('Chart is not available to export. Please enter some data first.');
+        return;
+    }
+    const imageURL = chart.toBase64Image();
+    // For most browsers
     const link = document.createElement('a');
-    link.href = chart.toBase64Image();
+    link.href = imageURL;
     link.download = 'bucks2bar-chart.png';
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    // For older browsers (fallback)
+    if (window.navigator.msSaveOrOpenBlob) {
+        const byteString = atob(imageURL.split(',')[1]);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ab], { type: 'image/png' });
+        window.navigator.msSaveOrOpenBlob(blob, 'bucks2bar-chart.png');
+    }
 }
 
 function printChart() {
@@ -87,6 +105,14 @@ window.onload = function() {
     // Initialize chart and listeners
     updateChart();
     addInputListeners();
-    document.getElementById('exportChartBtn').addEventListener('click', exportChart);
-    document.getElementById('printChartBtn').addEventListener('click', printChart);
+    // Use the correct button ID for download
+    const downloadBtn = document.getElementById('downloadChart');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', exportChart);
+    }
+    // Only add print button listener if it exists
+    const printBtn = document.getElementById('printChartBtn');
+    if (printBtn) {
+        printBtn.addEventListener('click', printChart);
+    }
 };
