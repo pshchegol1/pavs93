@@ -125,7 +125,6 @@
             <div class="home-service-grid">
                 @foreach (var service in activeServices.OrderBy(x => x.IsRunning).ThenByDescending(x => x.IsImportant).ThenBy(x => x.ServiceName))
                 {
-                    var incidentDates = service.ServiceDownHistories.Select(x => x.DateAdded.Date).ToHashSet();
                     var endpoint = string.IsNullOrWhiteSpace(service.Url) ? service.Ipaddress : service.Url;
                     var statusClass = service.IsRunning ? "is-running" : "is-down";
                     <article class="home-service-card @(service.IsRunning ? "home-card-running" : "home-card-down")">
@@ -143,8 +142,17 @@
                         <div class="home-incident-strip" aria-label="Incident days over the last 14 days">
                             @foreach (var day in recentDays)
                             {
-                                var hadIncident = incidentDates.Contains(day.Date);
-                                <span class="@(hadIncident ? "incident-day" : "clear-day")" title="@day.ToString("MMM d")@(hadIncident ? " · incident recorded" : " · no incident recorded")"></span>
+                                var hadIncident = service.ServiceDownHistories.Any(history =>
+                                    history.DateAdded.Date <= day.Date &&
+                                    (history.BackUpDateTime?.Date ?? (service.IsRunning ? history.DateAdded.Date : today)) >= day.Date);
+                                var isToday = day.Date == today;
+                                var incidentClass = hadIncident || (isToday && !service.IsRunning)
+                                    ? "incident-day"
+                                    : isToday ? "current-day" : "clear-day";
+                                var dayDescription = hadIncident || (isToday && !service.IsRunning)
+                                    ? "outage recorded"
+                                    : isToday ? "currently running" : "no outage recorded";
+                                <span class="@incidentClass" title="@day.ToString("MMM d") · @dayDescription"></span>
                             }
                         </div>
                         <div class="home-strip-caption"><span>LAST 14 DAYS</span><span>@service.ServiceDownHistories.Count incident@(service.ServiceDownHistories.Count == 1 ? "" : "s") recorded</span></div>

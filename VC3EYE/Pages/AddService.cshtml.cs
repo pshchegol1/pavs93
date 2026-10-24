@@ -15,7 +15,7 @@ namespace VC3EYE.Pages
     {
         private readonly Vc3eyeContext _db;
 
-        public string Message { get; set; }
+        public string? Message { get; set; }
 
         public AddServiceModel(Vc3eyeContext db)
         {
@@ -23,15 +23,14 @@ namespace VC3EYE.Pages
         }
 
         [BindProperty]
-        public ServiceModel currentService { get; set; }
+        public ServiceModel currentService { get; set; } = new();
 
         /// <summary>
         /// When page load
         /// </summary>
         public void OnGet()
         {
-            //preload
-            Message = "Please enter the service URL or IP for checking!";
+            Message = null;
         }
 
         /// <summary>
@@ -40,27 +39,25 @@ namespace VC3EYE.Pages
         /// <returns></returns>
         public IActionResult OnPostAdd()
         {
-            //process if input is valid
+            if (string.IsNullOrWhiteSpace(currentService.ServiceURL) && string.IsNullOrWhiteSpace(currentService.IPAddress))
+            {
+                ModelState.AddModelError(string.Empty, "Enter a service URL or IP address so VC3EYE knows what to monitor.");
+            }
+
             if (ModelState.IsValid)
             {
-                //check one of required fields in input and set feedback
-                if (currentService.ServiceURL == null && currentService.IPAddress == null)
-                {
-                    Message = "Please enter the service URL or IP for checking!";
-
-                    //pop up 2
-                    string script = "<script>showMessage();</script>";
-                    ViewData["Script"] = script;
-
-                    return Page();
-                }
-
                 //declare
                 var sc = new ServiceController(_db);
-                currentService.UserID = Convert.ToInt32(User.FindFirstValue(ClaimTypes.NameIdentifier).ToString());
+                currentService.UserID = Convert.ToInt32(User.FindFirstValue(ClaimTypes.NameIdentifier));
 
                 //flag
                 bool confirmation = sc.AddService(currentService);
+
+                if (!confirmation)
+                {
+                    ModelState.AddModelError(string.Empty, "The service could not be saved. Please review the details and try again.");
+                    return Page();
+                }
 
                 var lm = new LogsManager(_db);
                 var userLog = new Log()
@@ -69,20 +66,17 @@ namespace VC3EYE.Pages
                     LogDescription = "Service - " + currentService.ServiceName,
                     IsAudit = false,
                     DateAdded = DateTime.Now,
-                    UserId = Convert.ToInt32(User.FindFirstValue(ClaimTypes.NameIdentifier).ToString())
+                    UserId = currentService.UserID
                 };
 
                 //logging
                 lm.AddUserActivityLog(userLog);
 
                 //message log
-                Message = "Service added successful!";
-
                 //go to Service List
                 return RedirectToPage("ServicesList");
             }
 
-            // Add logic
             return Page();
         }
 
@@ -90,18 +84,6 @@ namespace VC3EYE.Pages
         /// <summary>
         /// Action when hit RESET
         /// </summary>
-        public IActionResult OnPostReset()
-        {
-            //call reset value function
-            //InitPage();
-
-            ModelState.Clear(); // clear any validation errors
-
-            // Add logic
-            return Page();
-        }
-
-
         public IActionResult OnPostGoBack()
         {
             ModelState.Clear(); // clear any validation errors

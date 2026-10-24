@@ -1,298 +1,181 @@
-﻿@page
+@page
 @model VC3EYE.Pages.ServiceInfoModel
 @using VC3EYE.Data;
 @{
-    int serviceID = Model.ServiceDetails.ServiceId;
-    string location = Model.ServiceDetails.Location ?? "";
-    string ipAddress = Model.ServiceDetails.Ipaddress ?? "No IP Address Provided";
-    string serviceUrl = Model.ServiceDetails.Url;
-    string serviceName = Model.ServiceDetails.ServiceName;
-    string downTimes = Model.ServiceDetails.NumOfDownTimes.ToString() ?? "0";
-    string lastTimeChecked = Model.ServiceDetails.LastTimeChecked.ToString("dddd, dd MMMM yyyy h:mm tt");
-    string description = Model.ServiceDetails.GeneralInformation ?? "";
-    string dateAdded = Model.ServiceDetails.DateAdded.ToString("dddd, dd MMMM yyyy h:mm tt");
-    string lastDateModified = Model.ServiceDetails.LastDateModified.ToString("dddd, dd MMMM yyyy h:mm tt");
-    string intExt = (Model.ServiceDetails.IsInternal) ? "Internal" : "External";
-    string isRunning = (Model.ServiceDetails.IsActive && Model.ServiceDetails.IsRunning) ? "Running" : (!Model.ServiceDetails.IsActive && !Model.ServiceDetails.IsDeleted) ? "Paused" : (!Model.ServiceDetails.IsActive && Model.ServiceDetails.IsDeleted) ? "Deleted" : "Down";
-    string important = (Model.ServiceDetails.IsImportant) ? "Important" : "Not Important";
-    string rssFeedLink = Model.ServiceDetails.RssfeedLink ?? "No RSS provided";
-    string lookupTerm = Model.ServiceDetails.LookupTerm ?? "No Term provided";
-    string portNum = Model.ServiceDetails.Port.ToString() ?? "";
-    string checkInterval = Model.ServiceDetails.CheckInterval.TotalMinutes.ToString() + " min";
-    string numOfBackup = Model.ServiceDetails.NumOfBackup.ToString() ?? "";
-    string addedBy = Model.ServiceDetails.User.FirstName + " " + Model.ServiceDetails.User.LastName;
-    string notificationMsg = Model.ServiceDetails.NotificationMessage ?? "No message provided";
-    string pauseStatus = (Model.ServiceDetails.IsActive && !Model.ServiceDetails.IsDeleted) ? "Pause" : "Resume";
-
-    //Edit Status Modal  
-    string bg = (Model.ServiceDetails.IsRunning) ? "bg-success" : "bg-danger";
-
-    ViewData["Title"] = serviceName + " Information";
+    var service = Model.ServiceDetails;
+    var serviceId = service.ServiceId;
+    var serviceName = service.ServiceName;
+    var isDeleted = service.IsDeleted;
+    var isPaused = !service.IsActive && !service.IsDeleted;
+    var status = isDeleted ? "Deleted" : isPaused ? "Paused" : service.IsRunning ? "Running" : "Down";
+    var statusClass = isDeleted || isPaused ? "detail-status-muted" : service.IsRunning ? "detail-status-up" : "detail-status-down";
+    var endpoint = string.IsNullOrWhiteSpace(service.Url) ? service.Ipaddress : service.Url;
+    var histories = service.ServiceDownHistories.OrderByDescending(x => x.DateAdded).ToList();
+    var monthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    var daysThisMonth = DateTime.DaysInMonth(DateTime.Today.Year, DateTime.Today.Month);
+    var incidentDays = new HashSet<int>();
+    foreach (var outage in histories)
+    {
+        var outageStart = outage.DateAdded.Date;
+        var outageEnd = outage.BackUpDateTime?.Date ?? (service.IsRunning ? outageStart : DateTime.Today);
+        var rangeStart = outageStart < monthStart ? monthStart : outageStart;
+        var rangeEnd = outageEnd > DateTime.Today ? DateTime.Today : outageEnd;
+        for (var outageDay = rangeStart; outageDay <= rangeEnd; outageDay = outageDay.AddDays(1))
+        {
+            incidentDays.Add(outageDay.Day);
+        }
+    }
+    var addedBy = service.User == null ? "Unknown" : $"{service.User.FirstName} {service.User.LastName}";
+    ViewData["Title"] = serviceName + " · Service details";
 }
 
-<br />
-
-<div class="service-info-con container-fluid">
-    @if (User.IsInRole(SiteRoles.Administrator) || User.IsInRole(SiteRoles.User))
-    {
-        <div class="d-flex justify-content-end">
-            @if (Model.ServiceDetails.IsDeleted)
-            {
-                <form method="post" asp-page="/ServiceInfo" asp-page-handler="UndoDelete" asp-route-serviceid="@serviceID">
-                    <input hidden asp-for="@Model.ServiceDetails.ServiceName" />
-                    <button type="submit" class="btn btn-outline-dark m-1"><i class="bi bi-arrow-counterclockwise"></i> Undo Delete</button>
-                </form>
-            }
-            @if (!Model.ServiceDetails.IsDeleted)
-            {
-                @*<button type="button" class="btn btn-outline-dark m-1"><i class="bi bi-file-earmark-excel"></i> Report</button>*@
-                <a asp-page="/EditService" asp-route-serviceid="@serviceID" class="btn btn-outline-dark m-1"><i class="bi bi-pencil-square"></i> Edit Service</a>
-                <form method="post" asp-page="/ServiceInfo" asp-page-handler="PauseService" asp-route-serviceid="@serviceID">
-                    <input hidden asp-for="@Model.ServiceDetails.ServiceName" />
-                    <button type="submit" class="btn btn-outline-dark m-1">
-                        @if (Model.ServiceDetails.IsActive)
-                        {
-                            <i class="bi bi-pause-btn"></i>
-                        }
-                        else
-                        {
-                            <i class="bi bi-play-fill"></i>
-                        }
-
-                        @pauseStatus Service Checking
-                    </button>
-                </form>
-            }
-            @if (Model.ServiceDetails.IsActive && !Model.ServiceDetails.IsDeleted)
-            {
-                <button type="button" class="btn btn-outline-dark m-1" data-bs-toggle="modal" data-bs-target="#editStatusModal"><i class="bi bi-pencil-square"></i> Edit Status</button>
-            }
-        </div>
-    }
-    
-    <hr />
+<div class="service-detail-page">
     <partial name="_Message" />
 
-    @if (Model.ServiceDetails != null && Model.ServiceDetails.IsDeleted)
+    <nav class="detail-breadcrumb" aria-label="Breadcrumb">
+        <a asp-page="/ServicesList"><i class="bi bi-arrow-left"></i> Services</a>
+        <span>/</span><span>@serviceName</span>
+    </nav>
+
+    @if (isDeleted)
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong><i class="bi bi-exclamation-triangle-fill"></i> Attention!</strong> The @serviceName service has been deleted.
+            <i class="bi bi-exclamation-triangle-fill"></i> This service has been deleted. Restore it to resume monitoring.
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
 
-    <div class="row">
-        <div class="col-6">
-            <div class="row d-flex justify-content-between">
-                <div class="col-4">
-                    <div class="input-group mb-3">
-                        <span class="input-group-text running-status @isRunning.ToLower()" id="basic-addon3" data-bs-toggle="tooltip" data-bs-placement="right" title="Service is @isRunning">
-                            @if (Model.ServiceDetails.IsActive && Model.ServiceDetails.IsRunning && !Model.ServiceDetails.IsDeleted)
-                            {
-                                <i class="bi bi-check-circle-fill"></i>
-                            }
-                            else if (!Model.ServiceDetails.IsActive && !Model.ServiceDetails.IsDeleted)
-                            {
-                                <i class="bi bi-pause-circle-fill"></i>
-                            }
-                            else if (!Model.ServiceDetails.IsActive && Model.ServiceDetails.IsDeleted)
-                            {
-                                <i class="bi bi-trash3-fill"></i>
-                            }
-                            else
-                            {
-                                <i class="bi bi-x-circle-fill"></i>
-                            }
-                        </span>
-                    </div>
-                </div>
-                <div class="col-3">
-                    <div class="input-group mb-3">
-                        <input type="text" class="form-control" disabled asp-for="@important" aria-describedby="basic-addon3">
-                    </div>
-                </div>
-                <div class="col-3">
-                    <div class="input-group mb-3">
-                        <input type="text" class="form-control" disabled asp-for="@intExt" aria-describedby="basic-addon3">
-                    </div>
-                </div>
+    <header class="detail-hero">
+        <div class="detail-hero-main">
+            <span class="detail-service-icon"><i class="bi bi-hdd-network"></i></span>
+            <div class="detail-title-group">
+                <div class="detail-kicker">SERVICE #@serviceId · @(service.IsInternal ? "INTERNAL" : "EXTERNAL")</div>
+                <h1>@serviceName</h1>
+                <div class="detail-subtitle"><i class="bi bi-geo-alt"></i> @service.Location <span>·</span> Added by @addedBy</div>
             </div>
         </div>
-
-        <div class="col-6">
-            <div class="input-group mb-3">
-                <input type="text" class="form-control" disabled asp-for="@ipAddress" aria-describedby="basic-addon3">
-            </div>
-        </div>
-        <div class="col-6 mb-3">
-            <label asp-for="@serviceName">Service Name</label>
-            <input type="text" class="form-control" disabled asp-for="@serviceName" aria-describedby="basic-addon3">
-        </div>
-        <div class="col-6">
-            <label asp-for="@serviceUrl">Service URL</label>
-            <input type="text" class="form-control" disabled asp-for="@serviceUrl" aria-describedby="basic-addon3">
-        </div>
-        <div class="col-12">
-            <div class="row">
-                <div class="col-3">
-                    <label asp-for="@location">Location</label>
-                    <input type="text" class="form-control" disabled asp-for="@location" aria-describedby="basic-addon3">
-                </div>
-                <div class="col-3">
-                    <label asp-for="@downTimes">Times Down</label>
-                    <input type="text" class="form-control" disabled asp-for="@downTimes" aria-describedby="basic-addon3">
-                </div>
-                <div class="col-3">
-                    <label asp-for="@lastTimeChecked">Last Time Checked</label>
-                    <input type="text" class="form-control" disabled asp-for="@lastTimeChecked" aria-describedby="basic-addon3">
-                </div>
-                <div class="col-3">
-                    <label asp-for="@portNum">Port</label>
-                    <input type="text" class="form-control" disabled asp-for="@portNum" aria-describedby="basic-addon3">
-                </div>
-            </div>
-            <br />
-            <div class="row">
-                <div class="col-3">
-                    <label asp-for="@rssFeedLink">RSS Feed Link</label>
-                    <input type="text" class="form-control" disabled asp-for="@rssFeedLink" aria-describedby="basic-addon3">
-                </div>
-                <div class="col-3">
-                    <label asp-for="@lookupTerm">Lookup Term</label>
-                    <input type="text" class="form-control" disabled asp-for="@lookupTerm" aria-describedby="basic-addon3">
-                </div>
-                <div class="col-3">
-                    <label asp-for="@checkInterval">Check Interval</label>
-                    <input type="text" class="form-control" disabled asp-for="@checkInterval" aria-describedby="basic-addon3">
-                </div>
-                <div class="col-3">
-                    <label asp-for="@numOfBackup">Number of Back Up</label>
-                    <input type="text" class="form-control" disabled asp-for="@numOfBackup" aria-describedby="basic-addon3">
-                </div>
-                <div class="col-3">
-                    <label asp-for="@addedBy">Added By</label>
-                    <input type="text" class="form-control" disabled asp-for="@addedBy" aria-describedby="basic-addon3">
-                </div>
-            </div>
-            <br />
-            <div class="row">
-                <div class="col-6">
-                    <label asp-for="@description">Description</label>
-                    <div class="form-floating">                  
-                        <textarea class="form-control" disabled placeholder="Leave a comment here" asp-for="@description" style="height: 100px"></textarea>                        
-                    </div>
-                    <br />
-                    <label asp-for="@notificationMsg">Notification Message</label>
-                    <div class="form-floating">
-                        <textarea class="form-control" disabled placeholder="Leave a comment here" asp-for="@notificationMsg" style="height: 100px"></textarea>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="col">
-                        <label asp-for="@dateAdded">Date Added</label>
-                        <input type="text" class="form-control" disabled asp-for="@dateAdded" aria-describedby="basic-addon3">
-                    </div>
-                    <div class="col">
-                        <label asp-for="@lastDateModified">Last Date Modified</label>
-                        <input type="text" class="form-control" disabled asp-for="@lastDateModified" aria-describedby="basic-addon3">
-                    </div>
-                    <br />
-                    <div class="col mt-lg-5">
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" asp-for="ServiceDetails.IsActive" disabled>
-                            <label class="form-check-label" asp-for="ServiceDetails.IsActive">Active</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" asp-for="ServiceDetails.IsDeleted" disabled>
-                            <label class="form-check-label" asp-for="ServiceDetails.IsDeleted">Deleted</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" asp-for="ServiceDetails.NotifyByMsteams" disabled>
-                            <label class="form-check-label" asp-for="ServiceDetails.NotifyByMsteams">Notify by MS Teams</label>
-                        </div>
-                    </div>
-                </div>              
-            </div>
-        </div>
-        
-    </div>
-    <hr />
-
-    @{
-        DateTime beginningOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
-        DateTime currentDate = DateTime.Now;
-        int daysInMonth = DateTime.DaysInMonth(currentDate.Year, currentDate.Month) + 1;
-        string month = beginningOfMonth.ToString("MMMM");
-    }
-
-    <span class="month-name"><b>@month</b></span>
-    <div class="d-flex justify-content-between mt-3">
-        @for (int i = 1; i < daysInMonth; i++)
-        {
-            if (Model.ServiceDetails.ServiceDownHistories.Count() > 0)
+        <div class="detail-hero-actions">
+            <span class="detail-status @statusClass"><span class="detail-status-dot"></span>@status</span>
+            @if (User.IsInRole(SiteRoles.Administrator) || User.IsInRole(SiteRoles.User))
             {
-                foreach (var s in Model.ServiceDetails.ServiceDownHistories)
+                @if (isDeleted)
                 {
-                    DateTime da = s.DateAdded;
-                    bool matchMonth = (s.DateAdded.Month == currentDate.Month);
-                    
-                    int d = (da - beginningOfMonth).Days + 1;
-
-                    if (i == d && matchMonth)
+                    <form method="post" asp-page-handler="UndoDelete" asp-route-serviceid="@serviceId">
+                        <input type="hidden" asp-for="ServiceDetails.ServiceName" />
+                        <button type="submit" class="detail-action-button"><i class="bi bi-arrow-counterclockwise"></i> Restore</button>
+                    </form>
+                }
+                else
+                {
+                    <a asp-page="/EditService" asp-route-serviceid="@serviceId" class="detail-action-button"><i class="bi bi-pencil-square"></i> Edit</a>
+                    <form method="post" asp-page-handler="PauseService" asp-route-serviceid="@serviceId">
+                        <input type="hidden" asp-for="ServiceDetails.ServiceName" />
+                        <button type="submit" class="detail-action-button"><i class="bi @(service.IsActive ? "bi-pause-fill" : "bi-play-fill")"></i> @(service.IsActive ? "Pause" : "Resume")</button>
+                    </form>
+                    @if (service.IsActive)
                     {
-                        int timesDown = Model.ServiceDetails.ServiceDownHistories.Where(x => x.DateAdded.Date == s.DateAdded.Date).ToList().Count;                        
-                        string title = "<div class='times-down-con'><span>Down: " + timesDown + " time(s)</span></div>";
-
-                        <div class="days-down" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="@month @i @title">@i</div>
-                        i++;
+                        <button type="button" class="detail-action-button detail-action-icon" data-bs-toggle="modal" data-bs-target="#editStatusModal" title="Edit status" aria-label="Edit service status"><i class="bi bi-sliders"></i></button>
                     }
                 }
             }
-            
-            if(i <= currentDate.Day)
-            {
-                <div class="days-up" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i">@i</div>
-            }
-            else
-            {
-                <div class="days-future" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i">@i</div>              
-            }          
-        }
+        </div>
+    </header>
+
+    <section class="detail-metrics" aria-label="Service metrics">
+        <article class="detail-metric"><span class="detail-metric-icon metric-check"><i class="bi bi-clock-history"></i></span><div><small>Last checked</small><strong>@service.LastTimeChecked.ToString("MMM d, h:mm tt")</strong></div></article>
+        <article class="detail-metric"><span class="detail-metric-icon metric-outage"><i class="bi bi-activity"></i></span><div><small>Recorded outages</small><strong>@histories.Count</strong></div></article>
+        <article class="detail-metric"><span class="detail-metric-icon metric-interval"><i class="bi bi-stopwatch"></i></span><div><small>Check interval</small><strong>@service.CheckInterval.TotalMinutes.ToString("0.#") min</strong></div></article>
+        <article class="detail-metric"><span class="detail-metric-icon @(service.IsIcmpRunning ? "metric-check" : "metric-muted")"><i class="bi bi-wifi"></i></span><div><small>ICMP ping</small><strong>@(service.IsIcmpRunning ? "Reachable" : "No reply")</strong></div></article>
+    </section>
+
+    <div class="detail-content-grid">
+        <div class="detail-main-column">
+            <section class="detail-card detail-check-card">
+                <div class="detail-card-heading"><div><div class="detail-kicker">LATEST RESULT</div><h2>Monitoring check</h2></div><span class="detail-result-indicator @(service.IsRunning ? "result-up" : "result-down")"><i class="bi @(service.IsRunning ? "bi-check2-circle" : "bi-exclamation-circle")"></i> @(service.IsRunning ? "Healthy" : "Needs attention")</span></div>
+                <p class="detail-check-message">@(string.IsNullOrWhiteSpace(service.NotificationMessage) ? "No check details have been recorded yet." : service.NotificationMessage)</p>
+                <div class="detail-check-footer"><span><i class="bi bi-arrow-repeat"></i> Checks every @service.CheckInterval.TotalMinutes.ToString("0.#") minutes</span><span>Last updated @service.LastDateModified.ToString("MMM d, yyyy")</span></div>
+            </section>
+
+            <section class="detail-card">
+                <div class="detail-card-heading"><div><div class="detail-kicker">THIS MONTH</div><h2>@monthStart.ToString("MMMM yyyy") activity</h2></div><span class="detail-legend"><i></i> outage recorded</span></div>
+                <div class="detail-calendar" role="img" aria-label="Outage records for @monthStart.ToString("MMMM")">
+                    @for (var day = 1; day <= daysThisMonth; day++)
+                    {
+                        var hasIncident = incidentDays.Contains(day);
+                        var calendarDate = monthStart.AddDays(day - 1);
+                        var isFuture = calendarDate > DateTime.Today;
+                        var dayClass = isFuture ? "calendar-future" : hasIncident ? "calendar-incident" : calendarDate == DateTime.Today ? (service.IsRunning ? "calendar-current-up" : "calendar-incident") : "calendar-unknown";
+                        var dayDescription = hasIncident || (!service.IsRunning && calendarDate == DateTime.Today) ? " · down" : calendarDate == DateTime.Today && service.IsRunning ? " · currently running" : isFuture ? " · future" : " · no outage recorded";
+                        <span class="@dayClass" title="@calendarDate.ToString("MMM d")@dayDescription"><small>@day</small></span>
+                    }
+                </div>
+                <div class="detail-calendar-caption"><span><i class="bi bi-info-circle"></i> Red marks recorded outage days; gray means no outage record</span><span>@incidentDays.Count day@(incidentDays.Count == 1 ? "" : "s") affected</span></div>
+            </section>
+
+            <section class="detail-card">
+                <div class="detail-card-heading"><div><div class="detail-kicker">HISTORY</div><h2>Recent outages</h2></div><span class="detail-history-count">@histories.Count total</span></div>
+                @if (histories.Any())
+                {
+                    <div class="detail-history-list">
+                        @foreach (var outage in histories.Take(6))
+                        {
+                            <article class="detail-history-item">
+                                <span class="history-marker @(outage.BackUpDateTime.HasValue ? "history-recovered" : "history-active")"><i class="bi @(outage.BackUpDateTime.HasValue ? "bi-arrow-counterclockwise" : "bi-exclamation-lg")"></i></span>
+                                <div class="history-copy"><strong>@(outage.BackUpDateTime.HasValue ? "Recovered" : "Still down")</strong><small>Started @outage.DateAdded.ToString("MMM d, yyyy · h:mm tt")@(outage.BackUpDateTime.HasValue ? $" · recovered {outage.BackUpDateTime.Value:MMM d, h:mm tt}" : "")</small></div>
+                                <span class="history-duration">@(outage.ResponseTime.HasValue ? $"{outage.ResponseTime.Value.TotalMinutes:F0} min response" : "")</span>
+                            </article>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="detail-no-history"><i class="bi bi-check2-circle"></i><span>No outages have been recorded for this service.</span></div>
+                }
+            </section>
+        </div>
+
+        <aside class="detail-side-column">
+            <section class="detail-card detail-endpoint-card">
+                <div class="detail-card-heading"><div><div class="detail-kicker">CONNECTION</div><h2>Endpoint</h2></div><span class="endpoint-card-icon"><i class="bi bi-link-45deg"></i></span></div>
+                <div class="detail-field"><small>URL</small><span class="detail-mono">@(string.IsNullOrWhiteSpace(service.Url) ? "Not configured" : service.Url)</span></div>
+                <div class="detail-field"><small>IP address</small><span class="detail-mono">@(string.IsNullOrWhiteSpace(service.Ipaddress) ? "Not configured" : service.Ipaddress)</span></div>
+                <div class="detail-field"><small>Port</small><span>@(service.Port?.ToString() ?? "Not configured")</span></div>
+                <div class="detail-field"><small>Location</small><span>@service.Location</span></div>
+            </section>
+
+            <section class="detail-card">
+                <div class="detail-card-heading"><div><div class="detail-kicker">CONFIGURATION</div><h2>Check settings</h2></div></div>
+                <div class="detail-setting-row"><span>Lookup term</span><strong>@(string.IsNullOrWhiteSpace(service.LookupTerm) ? "None" : service.LookupTerm)</strong></div>
+                <div class="detail-setting-row"><span>RSS feed</span><strong>@(string.IsNullOrWhiteSpace(service.RssfeedLink) ? "None" : service.RssfeedLink)</strong></div>
+                <div class="detail-setting-row"><span>Backup threshold</span><strong>@(service.NumOfBackup?.ToString() ?? "0")</strong></div>
+                <div class="detail-setting-row"><span>Priority</span><strong>@(service.IsImportant ? "Important" : "Standard")</strong></div>
+                <div class="detail-setting-row"><span>Teams notifications</span><strong>@(service.NotifyByMsteams ? "On" : "Off")</strong></div>
+            </section>
+
+            <section class="detail-card">
+                <div class="detail-card-heading"><div><div class="detail-kicker">ABOUT</div><h2>Service details</h2></div></div>
+                <p class="detail-description">@(string.IsNullOrWhiteSpace(service.GeneralInformation) ? "No description provided." : service.GeneralInformation)</p>
+                <div class="detail-setting-row"><span>Added</span><strong>@service.DateAdded.ToString("MMM d, yyyy")</strong></div>
+                <div class="detail-setting-row"><span>Last modified</span><strong>@service.LastDateModified.ToString("MMM d, yyyy")</strong></div>
+                <div class="detail-setting-row"><span>Times down</span><strong>@(service.NumOfDownTimes?.ToString() ?? "0")</strong></div>
+            </section>
+        </aside>
     </div>
-    
 </div>
 
-
-<!-- Edit Status Modal -->
 <div class="modal fade" id="editStatusModal" tabindex="-1" aria-labelledby="editStatusModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editStatusModalLabel">Edit Status</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                <span class="position-absolute top-0 start-100 translate-middle p-2 @bg border border-light rounded-circle" data-bs-toggle="tooltip" data-bs-placement="right" title="Currently @serviceName is @isRunning">
-                    <span class="visually-hidden">New alerts</span>
-                </span>
-            </div>
-            <form method="post" asp-page-handler="EditSatus" asp-route-serviceid="@serviceID">
-                <input hidden asp-for="@Model.ServiceDetails.ServiceName" />
+        <div class="modal-content detail-status-modal">
+            <div class="modal-header"><div><div class="detail-kicker">MANUAL OVERRIDE</div><h5 class="modal-title" id="editStatusModalLabel">Edit service status</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <form method="post" asp-page-handler="EditSatus" asp-route-serviceid="@serviceId">
+                <input type="hidden" asp-for="ServiceDetails.ServiceName" />
                 <div class="modal-body">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" asp-for="ServiceDetails.IsRunning" data-status="@Model.ServiceDetails.IsRunning.ToString().ToLower()">
-                        <label class="form-check-label" asp-for="ServiceDetails.IsRunning">Down</label>
-                    </div>
-                    <hr />
-                    <div>
-                        <label asp-for="ServiceDetails.NotificationMessage"><b>Notification Message:</b></label>
-                        <br />
-                        <textarea class="form-control" placeholder="Leave a message here" asp-for="ServiceDetails.NotificationMessage" style="height: 100px"></textarea>
-                    </div>
+                    <div class="form-check form-switch detail-status-switch"><input class="form-check-input" type="checkbox" asp-for="ServiceDetails.IsRunning" data-status="@service.IsRunning.ToString().ToLower()"><label class="form-check-label" asp-for="ServiceDetails.IsRunning">Service is running</label></div>
+                    <label asp-for="ServiceDetails.NotificationMessage"><b>Status note</b></label>
+                    <textarea class="form-control" asp-for="ServiceDetails.NotificationMessage" rows="3" placeholder="Add a short note"></textarea>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>
-            </form>          
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save status</button></div>
+            </form>
         </div>
     </div>
 </div>

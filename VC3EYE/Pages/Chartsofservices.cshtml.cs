@@ -1,40 +1,75 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using System.Linq;
 using VC3EYE.Data;
-using VC3EYE.Entities;
 
 namespace VC3EYE.Pages
 {
     public class ChartsofservicesModel : PageModel
     {
-        private Vc3eyeContext _db;
+        private readonly Vc3eyeContext _db;
+
         public ChartsofservicesModel(Vc3eyeContext db)
         {
             _db = db;
         }
-        [BindProperty]
-       public List<ServiceDownHistory> serviceDownHistory { get; set; } = default!;
 
-        public List<string> Months { get; set; }
-        public List<int> Down { get; set; }
-        public async Task OnGetAsync()
+        public int TotalServices { get; private set; }
+        public int RunningServices { get; private set; }
+        public int DownServices { get; private set; }
+        public int TotalOutagesLast30Days { get; private set; }
+        public int PeakDailyOutages { get; private set; }
+        public List<DailyOutagePoint> DailyOutages { get; private set; } = new();
+        public List<ServiceOutageSummary> MostOutages { get; private set; } = new();
+        public List<RecentOutage> RecentOutages { get; private set; } = new();
+
+        public async Task OnGetAsync(CancellationToken cancellationToken)
         {
-            serviceDownHistory = await _db.ServiceDownHistories.ToListAsync();
-            var downByMonth = serviceDownHistory.GroupBy(s => new { s.DateAdded.Year, s.DateAdded.Month, s.DateAdded.Day })
-                                 .Select(g => new { Month = new DateTime(g.Key.Year, g.Key.Month, g.Key.Day),
-                                  MGType = g.Count(a => a.ServiceId == 24) })
-                                 .ToArray();
-            // Create the X-axis labels 
-            Months = downByMonth.Select(s => s.Month.ToString("yyyy-MMM-dd")).ToList();
-            //Create Y-Axis Labels
-            Down = downByMonth.Select(s => s.MGType).ToList();
+            var activeServices = await _db.Services
+                .Where(service => service.IsActive && !service.IsDeleted)
+                .Select(service => new { service.ServiceId, service.ServiceName, service.IsRunning })
+                .ToListAsync(cancellationToken);
+
+            TotalServices = activeServices.Count;
+            RunningServices = activeServices.Count(service => service.IsRunning);
+            DownServices = TotalServices - RunningServices;
+
+            var startDate = DateTime.Today.AddDays(-29);
+            var history = await _db.ServiceDownHistories
+                .Include(outage => outage.Service)
+                .Where(outage => outage.DateAdded >= startDate)
+                .OrderByDescending(outage => outage.DateAdded)
+                .ToListAsync(cancellationToken);
+
+            TotalOutagesLast30Days = history.Count;
+            var outagesByDay = history.GroupBy(outage => outage.DateAdded.Date)
+                .ToDictionary(group => group.Key, group => group.Count());
+
+            DailyOutages = Enumerable.Range(0, 30)
+                .Select(offset => startDate.AddDays(offset))
+                .Select(day => new DailyOutagePoint(day, outagesByDay.GetValueOrDefault(day.Date)))
+                .ToList();
+            PeakDailyOutages = DailyOutages.Max(point => point.Count);
+
+            MostOutages = history
+                .GroupBy(outage => new { outage.ServiceId, ServiceName = outage.Service?.ServiceName ?? $"Service #{outage.ServiceId}" })
+                .Select(group => new ServiceOutageSummary(group.Key.ServiceId, group.Key.ServiceName, group.Count()))
+                .OrderByDescending(item => item.Count)
+                .ThenBy(item => item.ServiceName)
+                .Take(6)
+                .ToList();
+
+            RecentOutages = history.Take(8)
+                .Select(outage => new RecentOutage(
+                    outage.ServiceId,
+                    outage.Service?.ServiceName ?? $"Service #{outage.ServiceId}",
+                    outage.DateAdded,
+                    outage.BackUpDateTime,
+                    outage.ResponseTime))
+                .ToList();
         }
     }
-    }
 
-
-
-
-
+    public sealed record DailyOutagePoint(DateTime Date, int Count);
+    public sealed record ServiceOutageSummary(int ServiceId, string ServiceName, int Count);
+    public sealed record RecentOutage(int ServiceId, string ServiceName, DateTime Started, DateTime? Recovered, TimeSpan? ResponseTime);
+}

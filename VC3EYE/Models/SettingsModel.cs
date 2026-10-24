@@ -1,33 +1,29 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-using VC3EYE.Entities;
+using System.ComponentModel.DataAnnotations;
 
 namespace VC3EYE.Models
 {
     public class SettingsModel
     {
-        [Required]
         public int SettingId { get; set; }
 
-        [Required]
+        [Range(1, 65535, ErrorMessage = "Enter a valid SMTP port from 1 to 65535.")]
         public int? SmtpPort { get; set; }
 
-        [Required]
+        [StringLength(100)]
         public string? SmtpUserName { get; set; }
 
-        [Required]
+        [DataType(DataType.Password)]
+        [StringLength(100)]
         public string? SmtpPassword { get; set; }
 
-        [Required]
+        [StringLength(100)]
         public string? MtClientId { get; set; }
 
-        [Required]
+        [DataType(DataType.Password)]
+        [StringLength(500)]
         public string? MtSecretKey { get; set; }
 
-        [Required]
-        public DateTime DateAdded { get; set; }
-
-        [Required]
-        public virtual ICollection<User> Users { get; } = new List<User>();
+        public bool ClearSmtpPassword { get; set; }
+        public bool ClearTeamsSecret { get; set; }
     }
 }

@@ -1,68 +1,72 @@
-﻿@page
+@page
 @model VC3EYE.Pages.ViewUsersModel
+@using VC3EYE.Data
 @{
     ViewData["Title"] = "Users";
+    var initials = (string first, string last) => $"{(string.IsNullOrWhiteSpace(first) ? "" : first[..1])}{(string.IsNullOrWhiteSpace(last) ? "" : last[..1])}".ToUpperInvariant();
 }
-<div class=" mt-3 ">
-    <h1>Users</h1>
+
+<div class="users-page">
+    <header class="users-heading">
+        <div>
+            <div class="users-eyebrow"><i class="bi bi-people-fill"></i> ADMINISTRATION</div>
+            <h1>Users</h1>
+            <p>Manage visibility into account roles and monitored services.</p>
+        </div>
+        <span class="users-total-badge"><i class="bi bi-person-check"></i> @Model.TotalUsers account@(Model.TotalUsers == 1 ? "" : "s")</span>
+    </header>
+
+    <section class="users-summary" aria-label="Account totals">
+        <article><span class="users-summary-icon users-total-icon"><i class="bi bi-people"></i></span><div><small>Total accounts</small><strong>@Model.TotalUsers</strong></div></article>
+        <article><span class="users-summary-icon users-admin-icon"><i class="bi bi-shield-lock"></i></span><div><small>Administrators</small><strong>@Model.AdminCount</strong></div></article>
+        <article><span class="users-summary-icon users-standard-icon"><i class="bi bi-person-gear"></i></span><div><small>Users</small><strong>@Model.UserCount</strong></div></article>
+        <article><span class="users-summary-icon users-viewer-icon"><i class="bi bi-eye"></i></span><div><small>Viewers</small><strong>@Model.ViewerCount</strong></div></article>
+    </section>
+
+    <section class="users-directory">
+        <div class="users-directory-heading">
+            <div><h2>Account directory</h2><span>@Model.Users.Count matching account@(Model.Users.Count == 1 ? "" : "s")</span></div>
+            <form method="get" class="users-search">
+                <i class="bi bi-search"></i>
+                <input type="search" name="SearchTerm" value="@Model.SearchTerm" placeholder="Search name, email, city, or role" aria-label="Search users" />
+                <button type="submit" aria-label="Search users"><i class="bi bi-arrow-right"></i></button>
+                @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
+                {
+                    <a asp-page="/ViewUsers" class="users-clear-search" title="Clear search" aria-label="Clear search"><i class="bi bi-x-lg"></i></a>
+                }
+            </form>
+        </div>
+        <div class="table-responsive">
+            <table class="table users-table align-middle mb-0">
+                <thead><tr><th>Account</th><th>Role</th><th>Location</th><th>Monitored services</th><th class="text-end">Account ID</th></tr></thead>
+                <tbody>
+                    @if (Model.Users.Any())
+                    {
+                        foreach (var user in Model.Users)
+                        {
+                            var role = user.Role;
+                            var roleClass = role.Equals(SiteRoles.Administrator, StringComparison.OrdinalIgnoreCase) ? "role-admin" : role.Equals(SiteRoles.Viewer, StringComparison.OrdinalIgnoreCase) ? "role-viewer" : "role-user";
+                            var displayName = $"{user.FirstName} {user.LastName}".Trim();
+                            <tr>
+                                <td>
+                                    <div class="users-account-cell">
+                                        <span class="users-avatar @roleClass">@initials(user.FirstName, user.LastName)</span>
+                                        <span class="users-account-copy"><strong>@(string.IsNullOrWhiteSpace(displayName) ? "Unnamed account" : displayName)</strong><small>@(string.IsNullOrWhiteSpace(user.Email) ? "No email provided" : user.Email)</small></span>
+                                    </div>
+                                </td>
+                                <td><span class="users-role @roleClass"><i class="bi @(roleClass == "role-admin" ? "bi-shield-lock" : roleClass == "role-viewer" ? "bi-eye" : "bi-person")"></i> @role</span></td>
+                                <td><span class="users-location"><i class="bi bi-geo-alt"></i> @user.City, @user.ProvinceState</span></td>
+                                <td><span class="users-service-count"><i class="bi bi-hdd-network"></i> @user.ServiceCount</span></td>
+                                <td class="users-id">#@user.UserId</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="5"><div class="users-empty"><span><i class="bi bi-person-x"></i></span><strong>No matching accounts</strong><p>Try a different name, email, city, or role.</p></div></td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
 </div>
-<hr />
-<table class="table table-bordered table-striped" width="=100%">
-    <thread>
-        <div class="col-6">
-        <tr>
-            <th>
-                UserId
-            </th>
-            <th>
-                FirstName
-            </th>
-            <th>
-                LastName
-            </th>
-            <th>
-                City
-            </th>
-            <th>
-                ProvinceState
-            </th>
-            <th>
-                PostalCode
-            </th>
-            <th>
-                Address
-            </th>
-            <th>
-                Phone
-            </th>
-            <th>
-                Email
-            </th>
-            <th>
-                UserName
-            </th>         
-            <th>
-                Role
-            </th>
-        </tr>
-    </thread>
-    <tbody>
-        @foreach (var obj in Model.user)
-        {
-            <tr>
-                <td>@obj.UserId</td>
-                <td>@obj.FirstName</td>
-                <td>@obj.LastName</td>
-                <td>@obj.City</td>
-                <td>@obj.ProvinceState</td>
-                <td>@obj.PostalCode</td>
-                <td>@obj.Address</td>
-                <td>@obj.Phone</td>
-                <td>@obj.Email</td>              
-                <td>@obj.UserName</td>
-                <td>@obj.Role.Description</td>
-            </tr>
-        }
-    </tbody>
-    </div>
-</table>

@@ -1,37 +1,106 @@
-﻿@page
+@page
 @model VC3EYE.Pages.ChartsofservicesModel
 @{
-    ViewData["Tittle"] = "Service Down History";
-
+    ViewData["Title"] = "Service analytics";
+    var healthPercent = Model.TotalServices == 0 ? 100 : (int)Math.Round((double)Model.RunningServices / Model.TotalServices * 100);
 }
-<canvas id="salesChart" width="400" height="200"></canvas>
 
-@section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.5.0/dist/chart.min.js"></script>
-    <script>
-        var salesData = {
-            labels: @Json.Serialize(Model.Months),
-            datasets: [{
-                label: 'ServiceDown',
-                data: @Json.Serialize(Model.Down ),
-                borderColor: 'rgb(255, 99, 132)',
-                tension: 0.1
-            }]
-        };
-        var chartOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
+<div class="analytics-page">
+    <header class="analytics-heading">
+        <div>
+            <div class="analytics-eyebrow"><i class="bi bi-bar-chart-line-fill"></i> MONITORING INSIGHTS</div>
+            <h1>Service analytics</h1>
+            <p>Availability and outage trends across your monitored services.</p>
+        </div>
+        <a asp-page="/ServicesList" class="analytics-link"><i class="bi bi-arrow-left"></i> Back to services</a>
+    </header>
+
+    <section class="analytics-summary" aria-label="Analytics summary">
+        <article><span class="analytics-summary-icon summary-purple"><i class="bi bi-hdd-stack"></i></span><div><small>Active services</small><strong>@Model.TotalServices</strong></div></article>
+        <article><span class="analytics-summary-icon summary-green"><i class="bi bi-check2-circle"></i></span><div><small>Running now</small><strong>@Model.RunningServices</strong></div></article>
+        <article><span class="analytics-summary-icon summary-red"><i class="bi bi-exclamation-circle"></i></span><div><small>Down now</small><strong>@Model.DownServices</strong></div></article>
+        <article><span class="analytics-summary-icon summary-blue"><i class="bi bi-activity"></i></span><div><small>Outages · 30 days</small><strong>@Model.TotalOutagesLast30Days</strong></div></article>
+    </section>
+
+    <section class="analytics-grid">
+        <article class="analytics-card analytics-trend-card">
+            <div class="analytics-card-heading"><div><span>LAST 30 DAYS</span><h2>Outage activity</h2></div><span class="analytics-total-pill">@Model.TotalOutagesLast30Days event@(Model.TotalOutagesLast30Days == 1 ? "" : "s")</span></div>
+            @if (Model.TotalServices > 0)
+            {
+                <div class="analytics-bar-chart" role="img" aria-label="Daily outage events over the last 30 days">
+                    <div class="analytics-y-labels"><span>@Model.PeakDailyOutages</span><span>@(Model.PeakDailyOutages / 2)</span><span>0</span></div>
+                    <div class="analytics-chart-plot">
+                        <div class="analytics-gridline grid-top"></div><div class="analytics-gridline grid-middle"></div><div class="analytics-gridline grid-bottom"></div>
+                        @foreach (var point in Model.DailyOutages)
+                        {
+                            var barHeight = Model.PeakDailyOutages == 0 || point.Count == 0 ? 0 : Math.Max(5, (int)Math.Round((double)point.Count / Model.PeakDailyOutages * 100));
+                            <div class="analytics-bar-column" title="@point.Date.ToString("MMM d"): @point.Count outage@(point.Count == 1 ? "" : "s")">
+                                <span class="analytics-bar-value" style="bottom:calc(@(barHeight)% + .3rem)">@(point.Count > 0 ? point.Count.ToString() : "")</span>
+                                <span class="analytics-bar @(point.Count > 0 ? "has-outage" : "")" style="height:@(barHeight)%"></span>
+                            </div>
+                        }
+                    </div>
+                    <div class="analytics-x-labels"><span>@Model.DailyOutages.First().Date.ToString("MMM d")</span><span>@Model.DailyOutages[14].Date.ToString("MMM d")</span><span>Today</span></div>
+                </div>
+                @if (Model.TotalOutagesLast30Days == 0)
+                {
+                    <div class="analytics-chart-empty"><i class="bi bi-check2-circle"></i> No outages were recorded in the last 30 days.</div>
                 }
             }
-        };
+            else
+            {
+                <div class="analytics-empty"><i class="bi bi-bar-chart"></i><strong>No active services yet</strong><span>Add a service to begin tracking availability.</span></div>
+            }
+        </article>
 
-        var salesChart = new Chart(document.getElementById('salesChart').getContext('2d'), {
-            type: 'line',
-            data: salesData,
-            options: chartOptions
-        });
-    </script>
-}
+        <article class="analytics-card analytics-health-card">
+            <div class="analytics-card-heading"><div><span>CURRENT STATUS</span><h2>Fleet health</h2></div></div>
+            <div class="analytics-health-gauge" style="--analytics-health:@healthPercent%" role="img" aria-label="@healthPercent percent of active services running"><div><strong>@healthPercent<small>%</small></strong><span>running</span></div></div>
+            <div class="analytics-health-legend"><span><i class="legend-running"></i> Running <strong>@Model.RunningServices</strong></span><span><i class="legend-down"></i> Down <strong>@Model.DownServices</strong></span></div>
+            <a asp-page="/ServicesList">View service statuses <i class="bi bi-arrow-right"></i></a>
+        </article>
+
+        <article class="analytics-card analytics-ranking-card">
+            <div class="analytics-card-heading"><div><span>LAST 30 DAYS</span><h2>Most outages</h2></div></div>
+            @if (Model.MostOutages.Any())
+            {
+                var maxOutages = Model.MostOutages.Max(item => item.Count);
+                <div class="analytics-ranking-list">
+                    @foreach (var item in Model.MostOutages)
+                    {
+                        var width = maxOutages == 0 ? 0 : Math.Max(6, (int)Math.Round((double)item.Count / maxOutages * 100));
+                        <a class="analytics-ranking-item" asp-page="/ServiceInfo" asp-route-serviceid="@item.ServiceId">
+                            <span class="analytics-ranking-label"><strong>@item.ServiceName</strong><small>@item.Count event@(item.Count == 1 ? "" : "s")</small></span>
+                            <span class="analytics-ranking-track"><i style="width:@(width)%"></i></span>
+                        </a>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="analytics-empty compact"><i class="bi bi-check2-circle"></i><span>No outage records in this period.</span></div>
+            }
+        </article>
+
+        <article class="analytics-card analytics-recent-card">
+            <div class="analytics-card-heading"><div><span>LATEST EVENTS</span><h2>Recent outages</h2></div><span class="analytics-total-pill">Last 30 days</span></div>
+            @if (Model.RecentOutages.Any())
+            {
+                <div class="analytics-event-list">
+                    @foreach (var outage in Model.RecentOutages)
+                    {
+                        <a asp-page="/ServiceInfo" asp-route-serviceid="@outage.ServiceId" class="analytics-event-item">
+                            <span class="analytics-event-icon @(outage.Recovered.HasValue ? "event-recovered" : "event-open")"><i class="bi @(outage.Recovered.HasValue ? "bi-arrow-counterclockwise" : "bi-exclamation-lg")"></i></span>
+                            <span class="analytics-event-copy"><strong>@outage.ServiceName</strong><small>@(outage.Recovered.HasValue ? "Recovered" : "Still down") · @outage.Started.ToString("MMM d, h:mm tt")</small></span>
+                            <span class="analytics-event-duration">@(outage.ResponseTime.HasValue ? $"{outage.ResponseTime.Value.TotalMinutes:F0} min" : "")</span>
+                        </a>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="analytics-empty compact"><i class="bi bi-check2-circle"></i><span>No outage events to display.</span></div>
+            }
+        </article>
+    </section>
+</div>

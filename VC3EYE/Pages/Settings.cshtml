@@ -1,44 +1,88 @@
-﻿@page
+@page
 @model VC3EYE.Pages.SettingsModel
 @{
     ViewData["Title"] = "Settings";
-
-    int settingid = (Model.Setting != null) ? @Model.Setting.SettingId : 0;
 }
 
-<form method="post" asp-page-handler="Save" asp-route-settingid="@settingid">
-    <div class=" mt-3 ">
-        <h1>Settings</h1>
-    </div>
-    <hr />
-    <div class="border p-3 mt-4">
-        <div asp-validation-summary="All"></div>
-        
-
-        <div class="mb-3">
-            <label asp-for="Setting.SmtpPort"></label>
-            <input asp-for="@Model.Setting.SmtpPort" class="form-control">
-        </div>
-        <div class="mb-3">
-            <label asp-for="Setting.SmtpUserName"></label>
-            <input asp-for="@Model.Setting.SmtpUserName" class="form-control">
-        </div>
-        <div class="mb-3">
-            <label asp-for="Setting.SmtpPassword"></label>
-            <input type="password" asp-for="@Model.Setting.SmtpPassword" class="form-control" />
-        </div>
-        <div class="mb-3">
-            <label asp-for="Setting.MtClientId"></label>
-            <input asp-for="@Model.Setting.MtClientId" class="form-control" />
-            <span asp-validation-for="Setting.MtClientId" class="text-danger"></span>
-        </div>
-        <div class="mb-3">
-            <label asp-for="Setting.MtSecretKey"></label>
-            <input asp-for="@Model.Setting.MtSecretKey" class="form-control" />
-        </div>          
+<div class="settings-page">
+    <header class="settings-heading">
         <div>
-            <button type="submit" class="btn btn-primary" style="width:150px;">Save</button>
+            <div class="settings-eyebrow"><i class="bi bi-sliders2-vertical"></i> ADMINISTRATION</div>
+            <h1>Settings</h1>
+            <p>Manage the email and Microsoft Teams connections used by VC3EYE.</p>
         </div>
-    </div>
+        <span class="settings-admin-badge"><i class="bi bi-shield-lock"></i> Administrator</span>
+    </header>
+
+    @if (TempData["SettingsSaved"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show settings-saved-alert" role="alert">
+            <i class="bi bi-check-circle-fill"></i> Settings saved successfully.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <form method="post" asp-page-handler="Save" class="settings-form">
+        <input type="hidden" asp-for="Setting.SettingId" />
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+        <section class="settings-card">
+            <div class="settings-card-heading">
+                <span class="settings-card-icon smtp-icon"><i class="bi bi-envelope-at"></i></span>
+                <div><span class="settings-card-kicker">OUTGOING EMAIL</span><h2>SMTP connection</h2><p>Used for sending system email notifications.</p></div>
+                <span class="settings-connection-state @(Model.HasSmtpPassword ? "connection-configured" : "connection-empty")"><i class="bi @(Model.HasSmtpPassword ? "bi-check-circle-fill" : "bi-dash-circle")"></i> @(Model.HasSmtpPassword ? "Configured" : "Not configured")</span>
+            </div>
+            <div class="settings-fields-grid">
+                <div class="settings-field">
+                    <label asp-for="Setting.SmtpUserName">SMTP username</label>
+                    <input asp-for="Setting.SmtpUserName" class="form-control" autocomplete="username" placeholder="notifications@example.com" />
+                    <span asp-validation-for="Setting.SmtpUserName" class="text-danger"></span>
+                </div>
+                <div class="settings-field">
+                    <label asp-for="Setting.SmtpPort">SMTP port</label>
+                    <input asp-for="Setting.SmtpPort" class="form-control" type="number" min="1" max="65535" placeholder="587" />
+                    <span asp-validation-for="Setting.SmtpPort" class="text-danger"></span>
+                    <small>Common secure submission port: 587</small>
+                </div>
+                <div class="settings-field settings-secret-field">
+                    <label asp-for="Setting.SmtpPassword">SMTP password</label>
+                    <input asp-for="Setting.SmtpPassword" class="form-control" type="password" autocomplete="new-password" placeholder="@(Model.HasSmtpPassword ? "Leave blank to keep the saved password" : "Enter SMTP password")" />
+                    <small>Your saved password is never shown. Enter a value only to replace it.</small>
+                    @if (Model.HasSmtpPassword)
+                    {
+                        <label class="settings-clear-secret"><input asp-for="Setting.ClearSmtpPassword" /> Remove saved SMTP password</label>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <section class="settings-card">
+            <div class="settings-card-heading">
+                <span class="settings-card-icon teams-icon"><i class="bi bi-microsoft-teams"></i></span>
+                <div><span class="settings-card-kicker">ALERT DELIVERY</span><h2>Microsoft Teams</h2><p>Credentials for sending service alerts to Teams.</p></div>
+                <span class="settings-connection-state @(Model.HasTeamsSecret ? "connection-configured" : "connection-empty")"><i class="bi @(Model.HasTeamsSecret ? "bi-check-circle-fill" : "bi-dash-circle")"></i> @(Model.HasTeamsSecret ? "Configured" : "Not configured")</span>
+            </div>
+            <div class="settings-fields-grid">
+                <div class="settings-field">
+                    <label asp-for="Setting.MtClientId">Teams client ID</label>
+                    <input asp-for="Setting.MtClientId" class="form-control" autocomplete="off" placeholder="Enter client ID" />
+                    <span asp-validation-for="Setting.MtClientId" class="text-danger"></span>
+                </div>
+                <div class="settings-field settings-secret-field">
+                    <label asp-for="Setting.MtSecretKey">Teams webhook or secret</label>
+                    <input asp-for="Setting.MtSecretKey" class="form-control" type="password" autocomplete="new-password" placeholder="@(Model.HasTeamsSecret ? "Leave blank to keep the saved secret" : "Enter Teams secret")" />
+                    <small>The saved value stays hidden. Enter a value only to replace it.</small>
+                    @if (Model.HasTeamsSecret)
+                    {
+                        <label class="settings-clear-secret"><input asp-for="Setting.ClearTeamsSecret" /> Remove saved Teams secret</label>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <div class="settings-save-row">
+            <span><i class="bi bi-info-circle"></i> Changes take effect after saving.</span>
+            <button type="submit" class="settings-save-button"><i class="bi bi-check2"></i> Save settings</button>
+        </div>
     </form>
-@Model.Message
+</div>

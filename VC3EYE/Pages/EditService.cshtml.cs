@@ -21,14 +21,14 @@ namespace VC3EYE.Pages
         }
 
         [BindProperty]
-        public ServiceModel Service { get; set; }
+        public ServiceModel Service { get; set; } = new();
 
         public void OnGet(int serviceid)
         {
             var sc = new ServiceController(_db);
             var service = sc.GetServiceByServiceID(serviceid);
 
-            int minutes = Convert.ToInt32(service.CheckInterval.ToString().Split(':')[1]);
+            int minutes = (int)Math.Round(service.CheckInterval.TotalMinutes);
 
             var serviceM = new ServiceModel()
             {
@@ -85,6 +85,25 @@ namespace VC3EYE.Pages
                 }
             }
 
+            var serviceEntity = new ServiceController(_db).GetServiceByServiceID(serviceid);
+            Service.ServiceID = serviceid;
+            if (serviceEntity != null)
+            {
+                Service.ServiceName = serviceEntity.ServiceName;
+                Service.ServiceURL = serviceEntity.Url;
+                Service.Location = serviceEntity.Location;
+                Service.IPAddress = serviceEntity.Ipaddress;
+                Service.GeneralInformation = serviceEntity.GeneralInformation;
+                Service.IsImportant = serviceEntity.IsImportant;
+                Service.Port = serviceEntity.Port;
+                Service.RSSFeedLink = serviceEntity.RssfeedLink;
+                Service.IsInternal = serviceEntity.IsInternal;
+                Service.NotifyByMSTeams = serviceEntity.NotifyByMsteams;
+                Service.NotificationMessage = serviceEntity.NotificationMessage;
+                Service.LookupTerm = serviceEntity.LookupTerm;
+                Service.NumOfBackup = serviceEntity.NumOfBackup;
+                Service.IsDeleted = serviceEntity.IsDeleted;
+            }
             return Page();
         }
     }

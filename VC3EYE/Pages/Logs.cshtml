@@ -1,96 +1,75 @@
-﻿@page
+@page
 @model VC3EYE.Pages.LogsModel
 @{
-    ViewData["Title"] = "Logs";
-
-    int currentPage = Convert.ToInt32(Request.Query["p"]) == 0 ? 1 : Convert.ToInt32(Request.Query["p"]);
+    ViewData["Title"] = "Change logs";
+    var startItem = Model.MatchingLogs == 0 ? 0 : (Model.CurrentPage - 1) * 20 + 1;
+    var endItem = Math.Min(Model.CurrentPage * 20, Model.MatchingLogs);
 }
 
-<div class="container-fluid mt-3">
-    <div class="jd-flex justify-content-between d-flex align-items-center">
-        <h1>Change Logs</h1>
-        <h4><span class="badge bg-secondary">Total: @Model.TotalLogs</span></h4>
-    </div>
-   
-    <hr>
-    @if(Model.SiteLogs != null && Model.SiteLogs.Count() > 0)
-    {
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th scope="col">Log Name</th>
-                    <th scope="col">Log Description</th>
-                    <th scope="col">Date Added</th>
-                    <th scope="col">User Name</th>
-                   @* <th scope="col">Audit</th>*@
-                </tr>
-            </thead>
-            <tbody>
-                @foreach(var l in Model.SiteLogs)
+<div class="logs-page">
+    <header class="logs-heading">
+        <div>
+            <div class="logs-eyebrow"><i class="bi bi-journal-text"></i> ACTIVITY & AUDIT</div>
+            <h1>Change logs</h1>
+            <p>Review recent actions taken across your VC3EYE account.</p>
+        </div>
+        <a asp-page="/ErrorLogs" class="logs-error-link"><i class="bi bi-exclamation-triangle"></i> Error logs</a>
+    </header>
+
+    <section class="logs-summary" aria-label="Log totals">
+        <article><span class="logs-summary-icon logs-total-icon"><i class="bi bi-journal-check"></i></span><div><small>All activity</small><strong>@Model.TotalLogs</strong></div></article>
+        <article><span class="logs-summary-icon logs-audit-icon"><i class="bi bi-shield-check"></i></span><div><small>Audit entries</small><strong>@Model.AuditLogs</strong></div></article>
+        <article><span class="logs-summary-icon logs-filter-icon"><i class="bi bi-funnel"></i></span><div><small>Matching search</small><strong>@Model.MatchingLogs</strong></div></article>
+    </section>
+
+    <section class="logs-panel">
+        <div class="logs-toolbar">
+            <div><h2>Activity history</h2><span>@(Model.MatchingLogs == 0 ? "No matching entries" : $"Showing {startItem}–{endItem} of {Model.MatchingLogs}")</span></div>
+            <form method="get" asp-page="/Logs" class="logs-search">
+                <i class="bi bi-search"></i>
+                <input type="search" asp-for="SearchTerm" placeholder="Search action, details, or user" aria-label="Search logs" />
+                <button type="submit" aria-label="Search logs"><i class="bi bi-arrow-right"></i></button>
+                @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
                 {
-                    string userName = l.User.FirstName + " " + l.User.LastName;
-                    string dateAdded = l.DateAdded.ToString("dddd, dd MMMM yyyy h:mm tt");
-
-                    <tr>
-                        <th>@l.LogName</th>
-                        <td>@l.LogDescription</td>
-                        <td>@dateAdded</td>
-                        <td>@userName</td>
-                        @*<td>
-                            @if (l.IsAudit)
-                            {
-                                <i class="bi bi-check-lg"></i>
-                            }
-                            else
-                            {
-                                <i class="bi bi-x-lg"></i>
-                            }
-                        </td>*@
-                    </tr>
+                    <a asp-page="/Logs" class="logs-clear-search" title="Clear search" aria-label="Clear search"><i class="bi bi-x-lg"></i></a>
                 }
-            </tbody>
-        </table>
+            </form>
+        </div>
 
-        @if(Model.NumOfPages > 1)
+        @if (Model.SiteLogs.Any())
         {
-            int prev = currentPage - 1;
-            int next = currentPage + 1;
+            <div class="table-responsive">
+                <table class="table logs-table align-middle mb-0">
+                    <thead><tr><th>Action</th><th>Details</th><th>Performed by</th><th>Date &amp; time</th></tr></thead>
+                    <tbody>
+                        @foreach (var log in Model.SiteLogs)
+                        {
+                            var userName = log.User == null ? "Unknown user" : $"{log.User.FirstName} {log.User.LastName}";
+                            var initials = log.User == null ? "?" : $"{(string.IsNullOrWhiteSpace(log.User.FirstName) ? "" : log.User.FirstName[..1])}{(string.IsNullOrWhiteSpace(log.User.LastName) ? "" : log.User.LastName[..1])}".ToUpperInvariant();
+                            var actionClass = log.LogName.Contains("delete", StringComparison.OrdinalIgnoreCase) ? "log-action-delete" : log.LogName.Contains("add", StringComparison.OrdinalIgnoreCase) ? "log-action-add" : log.LogName.Contains("update", StringComparison.OrdinalIgnoreCase) || log.LogName.Contains("edit", StringComparison.OrdinalIgnoreCase) ? "log-action-update" : "log-action-default";
+                            <tr>
+                                <td><span class="logs-action @actionClass"><i class="bi @(actionClass == "log-action-delete" ? "bi-trash3" : actionClass == "log-action-add" ? "bi-plus-circle" : actionClass == "log-action-update" ? "bi-pencil-square" : "bi-lightning-charge")"></i> @log.LogName</span></td>
+                                <td><span class="logs-description">@log.LogDescription</span>@if (log.IsAudit){<small class="logs-audit-tag"><i class="bi bi-shield-check"></i> Audit</small>}</td>
+                                <td><span class="logs-user"><span class="logs-user-avatar">@initials</span><span>@userName</span></span></td>
+                                <td><time class="logs-time" datetime="@log.DateAdded.ToString("o")"><strong>@log.DateAdded.ToString("MMM d, yyyy")</strong><small>@log.DateAdded.ToString("h:mm:ss tt")</small></time></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="logs-empty"><span><i class="bi bi-search"></i></span><strong>No log entries found</strong><p>Try another search term or clear the filter.</p></div>
+        }
 
-            int lowestPage = (currentPage >= 3) ? (currentPage - 2) : 1;
-            int highestPage = currentPage + 3 <= Model.NumOfPages ? currentPage + 2 : Model.NumOfPages;
-
-            <nav aria-label="Logs page navigation">
-                <ul class="pagination justify-content-end">
-                    @if(currentPage > 1)
-                    {                                             
-                        <li class="page-item">
-                            <a class="page-link" aria-label="Previous" asp-page="/Logs" asp-route-p="@prev">
-                                <span aria-hidden="true">&laquo;</span>
-                            </a>
-                        </li>
-                    }
-                    @for (int i = lowestPage; i <= highestPage; i++)
-                    {
-                        string activePage = currentPage == i ? "active" : "";
-
-                        <li class="page-item @activePage"><a asp-page="/Logs" asp-route-p="@i" class="page-link">@i</a></li>
-                    }
-                    @if(currentPage != Model.NumOfPages)
-                    {                       
-                        <li class="page-item">
-                            <a class="page-link" aria-label="Next" asp-page="/Logs" asp-route-p="@next">
-                                <span aria-hidden="true">&raquo;</span>
-                            </a>
-                        </li>
-                    }
-                </ul>
+        @if (Model.NumOfPages > 1)
+        {
+            <nav class="logs-pagination" aria-label="Log pages">
+                <a class="logs-page-button @(Model.CurrentPage <= 1 ? "disabled" : "")" asp-page="/Logs" asp-route-p="@(Model.CurrentPage - 1)" asp-route-SearchTerm="@Model.SearchTerm" aria-label="Previous page"><i class="bi bi-chevron-left"></i></a>
+                <span>Page <strong>@Model.CurrentPage</strong> of @Model.NumOfPages</span>
+                <a class="logs-page-button @(Model.CurrentPage >= Model.NumOfPages ? "disabled" : "")" asp-page="/Logs" asp-route-p="@(Model.CurrentPage + 1)" asp-route-SearchTerm="@Model.SearchTerm" aria-label="Next page"><i class="bi bi-chevron-right"></i></a>
             </nav>
         }
-    }
-    else
-    {
-        <div class="alert alert-warning text-center fw-bold" role="alert">
-            <div colspan="4">No Logs <i class="bi bi-exclamation-triangle"></i></div>
-        </div>
-    }
+    </section>
 </div>
