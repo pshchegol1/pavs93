@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
+using System.Diagnostics;
 
 using VC3EYE.Entities;
 
@@ -16,6 +17,15 @@ namespace VC3EYE.Data
     /// </summary>
     public class ServiceManager
     {
+        private static readonly HttpClient MonitoringHttpClient = CreateMonitoringHttpClient();
+
+        private static HttpClient CreateMonitoringHttpClient()
+        {
+            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("VC3EYE-Monitor/1.0 (+service health check)");
+            return client;
+        }
+
         //declare database
         private readonly Vc3eyeContext _db;
 
@@ -297,94 +307,70 @@ namespace VC3EYE.Data
         /// Check Service URL status through the HTTPClient and Page content - NO LOOP
         /// </summary>
         /// <param name="s">Checking Service</param>
-        public async Task<bool> CheckHTTPStatus(object? state, Service s)
+        public async Task<HttpCheckResult> CheckHttp(object? state, Service s)
         {
-            //get meta info
-            if (s == null || s.Url == null) { return false; }
+            if (s?.Url == null || !Uri.TryCreate(s.Url, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                return new HttpCheckResult(false, null, "Invalid HTTP/HTTPS URL", null, 0, null);
 
-            string url = s.Url;
-
-            // Check if the URL is valid
-            if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uriResult)
-                && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps))
+            var timer = Stopwatch.StartNew();
+            try
             {
-                // Create a new instance of HttpClient, which will be reused for all requests
-                using (HttpClient client = new HttpClient())
+                using var response = await MonitoringHttpClient.GetAsync(uri, HttpCompletionOption.ResponseContentRead);
+                var body = await response.Content.ReadAsStringAsync();
+                timer.Stop();
+                var status = (int)response.StatusCode;
+                var reachable = status < 500;
+                var message = $"HTTP {status} {response.ReasonPhrase}";
+                // A block or rate limit proves the host is reachable. Don't treat its
+                // challenge page as a missing application keyword.
+                if (status == 403 || status == 429)
                 {
-                    try
-                    {
-                        // Send an HTTP GET request to the service website
-                        HttpResponseMessage response = await client.GetAsync(url);
-
-                        //Conver URL string to URI
-                        Uri siteUri = new Uri(url);
-
-                        // Ensure that the response status code is in the 2xx range, indicating success
-                        response.EnsureSuccessStatusCode();
-                    }
-                    catch
-                    {
-                        //return flag for this check
-                        return false;
-                    }
+                    message += " (reachable; request may be blocked or rate-limited; content check skipped)";
+                    return new HttpCheckResult(true, status, message, response.RequestMessage?.RequestUri?.ToString(), timer.ElapsedMilliseconds, null);
                 }
-
-                //happy
-                return true;
+                if (!string.IsNullOrWhiteSpace(s.LookupTerm) && !body.Contains(s.LookupTerm, StringComparison.OrdinalIgnoreCase))
+                    return new HttpCheckResult(false, status, message + "; expected content was not found", response.RequestMessage?.RequestUri?.ToString(), timer.ElapsedMilliseconds, null);
+                return new HttpCheckResult(reachable, status, message, response.RequestMessage?.RequestUri?.ToString(), timer.ElapsedMilliseconds, null);
             }
-
-            //end flag of the URI check
-            else return false;
+            catch (TaskCanceledException ex)
+            {
+                timer.Stop();
+                return new HttpCheckResult(false, null, "HTTP request timed out", uri.ToString(), timer.ElapsedMilliseconds, ex.Message);
+            }
+            catch (HttpRequestException ex)
+            {
+                timer.Stop();
+                return new HttpCheckResult(false, null, "HTTP request failed", uri.ToString(), timer.ElapsedMilliseconds, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                timer.Stop();
+                return new HttpCheckResult(false, null, "HTTP check error", uri.ToString(), timer.ElapsedMilliseconds, ex.Message);
+            }
         }
+
+        public async Task<bool> CheckHTTPStatus(object? state, Service s) => (await CheckHttp(state, s)).IsHealthy;
 
         public async Task<Tuple<bool, int, string>> CheckHTTPResponse(object? state, Service s)
         {
-            //initial
-            Tuple<bool, int, string> obj = new Tuple<bool, int, string>(false, 123, "No Feedback");
+            if (s == null || s.Url == null) return Tuple.Create(false, 0, "No URL configured");
+            var result = await CheckHttp(state, s);
+            return Tuple.Create(result.IsHealthy, result.StatusCode ?? 0, result.Message + (result.Error == null ? "" : ": " + result.Error));
+        }
 
-            //get meta info
-            if (s == null || s.Url == null) { return obj; }
-
-            string url = s.Url;
-
-            // Check if the URL is valid
-            if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uriResult)
-                && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps))
-            {
-                // Create a new instance of HttpClient, which will be reused for all requests
-                using (HttpClient client = new HttpClient())
-                {
-                    try
-                    {
-                        // Send an HTTP GET request to the service website
-                        HttpResponseMessage response = await client.GetAsync(url);
-
-                        //Conver URL string to URI
-                        Uri siteUri = new Uri(url);
-
-                        //get the code
-                        int code = (int)response.StatusCode;
-
-                        // Ensure that the response status code is in the 2xx range, indicating success
-                        bool success = response.IsSuccessStatusCode;
-
-                        //response.EnsureSuccessStatusCode();
-
-                        obj = new Tuple<bool, int, string>(success, code, response.ReasonPhrase ?? string.Empty);
-
-                        return obj;
-                    }
-                    catch
-                    {
-                        //return flag for this check
-                        return obj;
-                    }
-                }
-
-            }
-
-            //end flag of the URI check
-            else return obj;
+        public void ApplyCheckResult(Service service, bool checkPassed, string diagnostic, int recoveryChecks = 3)
+        {
+            var wasRunning = service.IsRunning;
+            var downThreshold = Math.Max(1, service.NumOfBackup ?? 0);
+            var streak = service.RunningDownCounter;
+            streak = checkPassed ? Math.Max(0, streak) + 1 : Math.Min(0, streak) - 1;
+            service.RunningDownCounter = streak;
+            if (!checkPassed && streak <= -downThreshold) service.IsRunning = false;
+            else if (checkPassed && streak >= Math.Max(1, recoveryChecks)) service.IsRunning = true;
+            if (service.IsRunning != wasRunning) service.NumOfDownTimes = 0;
+            service.LastTimeChecked = DateTime.Now;
+            service.NotificationMessage = diagnostic.Length <= 100 ? diagnostic : diagnostic[..100];
         }
 
 
@@ -725,4 +711,6 @@ namespace VC3EYE.Data
             return s.IsIcmpRunning;
         }
     }
+
+    public sealed record HttpCheckResult(bool IsHealthy, int? StatusCode, string Message, string? FinalUrl, long ElapsedMilliseconds, string? Error);
 }

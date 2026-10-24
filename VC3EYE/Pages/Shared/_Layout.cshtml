@@ -20,13 +20,13 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/VC3EYE.styles.css" asp-append-version="true" />
 </head>
-<body>
+<body class="app-body">
     @if (User.Identity.IsAuthenticated)
     {
         <div class="d-flex" id="wrapper">
             <!-- Sidebar-->
             <div class="border-end bg-white" id="sidebar-wrapper">
-                <div class="sidebar-heading border-bottom bg-light"><a class="list-group-item list-group-item-action text-center" asp-page="/Index"><i class="bi bi-eye-fill"></i> VC3EYE</a></div>
+                <div class="sidebar-heading border-bottom bg-light"><a class="list-group-item list-group-item-action text-center" asp-page="/Index"><span class="brand-mark"><i class="bi bi-eye-fill"></i></span><span>VC3EYE</span></a></div>
                 <div class="list-group list-group-flush">
                    
                     <a class="list-group-item list-group-item-action list-group-item-light p-3" asp-page="/ServicesList"><b><i class="bi bi-info-square icon-bold"></i> Services</b></a>
@@ -58,7 +58,7 @@
             <!-- Page content wrapper-->
             <div id="page-content-wrapper">
                 <!-- Top navigation-->
-                <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+                <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom app-topbar">
                     <div class="container-fluid">
                         <button class="btn btn-primary" id="sidebarToggle"><i class="bi bi-list"></i></button>
                         <form method="post" asp-page="/Login" asp-page-handler="Logout">
@@ -78,15 +78,15 @@
                     </div>
                 </nav>
                 <!-- Page content-->
-                <div class="container-fluid">
-                    <main role="main" class="pb-3">
+                <div class="container-fluid app-content">
+                    <main role="main" class="pb-3 app-main">
                         @RenderBody()
                     </main>
                 </div>
             </div>
         </div>
 
-        <footer class="border-top footer bg-light text-muted">
+        <footer class="border-top footer bg-light text-muted app-footer">
             <div class="container-fluid d-flex justify-content-center footer-con">
                 &copy; 2023 - VC3EYE - <a asp-area="" asp-page="/Privacy">Privacy</a>
             </div>

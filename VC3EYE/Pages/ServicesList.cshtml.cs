@@ -205,81 +205,28 @@ namespace VC3EYE.Pages
             {
                 ServiceManager sm = arg.Item1;
                 Service s = arg.Item2;
+                var st = new SettingContoller(_db).GetCurrentSetting();
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+                var http = await sm.CheckHttp(s, s);
+                var passed = http.IsHealthy;
+                var diagnostic = $"{http.Message}{(http.Error == null ? "" : ": " + http.Error)}; {http.ElapsedMilliseconds} ms";
 
-                var stc = new SettingContoller(_db);
-                Setting? st = null;
-
-                string sDesc = "N/A";
-
-                lock (sm)
-                    st = stc.GetCurrentSetting();
-
-                System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-                stopwatch.Start();
-
-                bool running = false;
-
-                //flag layers
-                bool bHTTP = false;
-                bool bPort = false;
-
-                if (!string.IsNullOrEmpty(s.Url))
+                // A configured TCP port is a fallback when the HTTP endpoint is not healthy.
+                if (!passed && s.Port is > 0 && await sm.CheckPort(s, s))
                 {
-                    lock (sm)
-                        bHTTP = running = sm.CheckHTTPStatus(s, s).Result;
+                    passed = true;
+                    diagnostic += "; TCP port reachable";
                 }
 
-                //set desc string
-                if (bHTTP)
-                {
-                    sDesc = "Checked - Http/Https Passed.";
-                }
+                s.IsIcmpRunning = sm.CheckICMP(s);
+                diagnostic += s.IsIcmpRunning ? "; ICMP passed" : "; ICMP failed (informational)";
+                // A successful manual probe should immediately clear a stale Down
+                // state; failures still use the configured consecutive-failure threshold.
+                sm.ApplyCheckResult(s, passed, diagnostic, recoveryChecks: 1);
+                sm.ModifyService(s);
 
-                if (!running)
-                {
-                    //set desc string
-                    lock (sm)
-                        sDesc = $"Checked - {sm.CheckHTTPResponse(s, s).Result.Item2} - {sm.CheckHTTPResponse(s, s).Result.Item3}";
-
-                    if (s.Port != null && s.Port > 0)
-                    {
-                        lock (sm)
-                            bPort = running = sm.CheckPort(s, s).Result;
-                    }
-                }
-
-                //set desc string
-                if (bPort)
-                {
-                    sDesc = $"{sDesc} - Port Passed";
-                }
-                else
-                {
-                    sDesc = $"{sDesc} - Port Failed";
-                }
-
-                //ICMP
-                lock (sm)
-                    s.IsIcmpRunning = sm.CheckICMP(s);
-
-                //set desc string
-                if (s.IsIcmpRunning)
-                    sDesc = $"{sDesc} - ICMP Passed";
-                else
-                    sDesc = $"{sDesc} - ICMP Failed";
-
-                //service s
-                s.IsRunning = running;
-                s.LastTimeChecked = DateTime.Now;
-                s.NotificationMessage = sDesc;
-                lock (sm)
-                    sm.ModifyService(s);
-
-                //send notification MS Teams webhook
                 if (!s.IsRunning && st != null) await sm.MSTeamsNotify(st, s);
-
-                stopwatch.Stop();
-                Console.WriteLine("Time: " + stopwatch.ElapsedMilliseconds);
+                timer.Stop();
             }
 
             RedirectToPage("ServicesList");

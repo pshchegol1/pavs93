@@ -95,50 +95,19 @@ namespace VC3EYE
                 bool RSSCheck = false;
                 bool PingCheck = false;
 
-                bool bHTTP = false;
-                string sDesc = "N/A";
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var http = string.IsNullOrWhiteSpace(s.Url)
+                    ? new HttpCheckResult(false, null, "No URL configured", null, 0, null)
+                    : sm.CheckHttp(s, s).GetAwaiter().GetResult();
+                HTMLResponseCheck = http.Message + (http.Error == null ? "" : ": " + http.Error);
+                bool running = http.IsHealthy;
+                string sDesc = $"{http.Message}; {http.ElapsedMilliseconds} ms";
 
-                //Stopwatch for testing (Remove later)
-                System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-                stopwatch.Start();
-
-                bool running = false;
-
-                if (!string.IsNullOrEmpty(s.Url))
+                if (!running && s.Port is > 0)
                 {
-
-                    bHTTP = running = sm.CheckHTTPStatus(s, s).Result;
-                    HTMLResponseCheck = sm.CheckHTTPResponse(s, s).Result.Item3;
-                }
-
-                //set desc string
-                if (bHTTP)
-                {
-                    sDesc = "Checked - Http/Https Passed.";
-                }
-
-                if (!running)
-                {
-                    //set desc string
-                    lock (sm)
-                        sDesc = $"Checked - {sm.CheckHTTPResponse(s, s).Result.Item2} - {sm.CheckHTTPResponse(s, s).Result.Item3}";
-
-                    if (s.Port != null && s.Port > 0)
-                    {
-
-                        running = sm.CheckPort(s, s).Result;
-                        PortCheck = running;
-                    }
-                }
-
-                //set desc string
-                if (PortCheck)
-                {
-                    sDesc = $"{sDesc} - Port Passed";
-                }
-                else
-                {
-                    sDesc = $"{sDesc} - Port Failed";
+                    PortCheck = sm.CheckPort(s, s).GetAwaiter().GetResult();
+                    running = PortCheck;
+                    sDesc += PortCheck ? "; TCP port reachable" : "; TCP port failed";
                 }
 
                 //ICMP
@@ -146,87 +115,28 @@ namespace VC3EYE
                 {
                     s.IsIcmpRunning = sm.CheckICMP(s);
                 }
+                PingCheck = s.IsIcmpRunning;
 
                 //set desc string
                 if (s.IsIcmpRunning)
-                    sDesc = $"{sDesc} - ICMP Passed";
+                    sDesc = $"{sDesc}; ICMP passed";
                 else
-                    sDesc = $"{sDesc} - ICMP Failed";
+                    sDesc = $"{sDesc}; ICMP failed (informational)";
 
-                s.NotificationMessage = sDesc;
-
-                if (s.IsRunning == true && running == true)
+                var wasRunning = s.IsRunning;
+                sm.ApplyCheckResult(s, running, sDesc);
+                lock (sm) sm.ModifyService(s);
+                if (wasRunning && !s.IsRunning)
                 {
-                    s.LastTimeChecked = DateTime.Now;
-                    lock (sm)
-                        sm.ModifyService(s);
+                    var sdh = new ServiceDownHistoryManager(_db);
+                    sdh.AddServiceDownHistory(new ServiceDownHistory { ServiceId = s.ServiceId, DateAdded = DateTime.Now,
+                        Htmlresponse = HTMLResponseCheck, ResponseTime = TimeSpan.FromMilliseconds(http.ElapsedMilliseconds),
+                        IsPingFailed = !PingCheck, IsPortFailed = s.Port.HasValue && !PortCheck, IsRssfeedFailed = RSSCheck });
                 }
-                else
+                else if (!wasRunning && s.IsRunning && s.ServiceDownHistories.Count > 0)
                 {
-                    if (!running)
-                    {
-                        if (s.NumOfDownTimes > 0)
-                            s.NumOfDownTimes = 0;
-                        if (s.NumOfDownTimes >= -s.NumOfBackup)
-                            s.NumOfDownTimes--;
-                        if (s.NumOfDownTimes == -s.NumOfBackup)
-                        {
-                            //Setting down if the service has passed the alloted checks
-                            //service = s
-                            s.IsRunning = running;
-                            s.LastTimeChecked = DateTime.Now;
-                            lock (sm)
-                                sm.ModifyService(s);
-
-                            var sdh = new ServiceDownHistoryManager(_db);
-                            ServiceDownHistory downHistory = new ServiceDownHistory()
-                            {
-                                ServiceId = s.ServiceId,
-                                DateAdded = DateTime.Now,
-                                Htmlresponse = HTMLResponseCheck,
-                                ResponseTime = null,
-                                IsPingFailed = PingCheck,
-                                IsPortFailed = PortCheck,
-                                IsRssfeedFailed = RSSCheck
-                            };
-                            lock (sdh)
-                                sdh.AddServiceDownHistory(downHistory);
-
-                        }
-                        else
-                        {
-                            s.LastTimeChecked = DateTime.Now;
-                            s.IsRunning = running;
-                            lock (sm)
-                                sm.ModifyService(s);
-                        }
-
-                    }
-                    else
-                    {
-                        if (s.NumOfDownTimes < 0)
-                            s.NumOfDownTimes = 0;
-                        s.NumOfDownTimes++;
-                        if (s.NumOfDownTimes == 3)
-                        {
-                            //Setting the service as running if it passes 3 susseccful checks
-                            //service = s
-                            s.IsRunning = running;
-                            s.LastTimeChecked = DateTime.Now;
-                            if (s.ServiceDownHistories.Count > 0)
-                                s.ServiceDownHistories.Last().BackUpDateTime = DateTime.Now;
-                            lock (sm)
-                                sm.ModifyService(s);
-                        }
-                        else
-                        {
-                            s.LastTimeChecked = DateTime.Now;
-                            s.IsRunning = running;
-                            lock (sm)
-                                sm.ModifyService(s);
-                        }
-                    }
-
+                    s.ServiceDownHistories.Last().BackUpDateTime = DateTime.Now;
+                    lock (sm) sm.ModifyService(s);
                 }
 
                 stopwatch.Stop();
