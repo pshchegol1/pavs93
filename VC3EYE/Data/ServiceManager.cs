@@ -29,9 +29,6 @@ namespace VC3EYE.Data
         //declare database
         private readonly Vc3eyeContext _db;
 
-        //lock
-        private Object thisLock = new Object();
-
         public ServiceManager(Vc3eyeContext db)
         {
             _db = db;
@@ -58,6 +55,14 @@ namespace VC3EYE.Data
             return service;
         }
 
+        public Task<Service?> GetServiceByIDAsync(int serviceid, CancellationToken cancellationToken = default)
+        {
+            return _db.Services
+                .Include(x => x.ServiceDownHistories)
+                .Include(x => x.User)
+                .FirstOrDefaultAsync(x => x.ServiceId == serviceid, cancellationToken);
+        }
+
         public List<Service> GetServiceBySearchTerm(string searchTerm)
         {
             if (string.IsNullOrEmpty(searchTerm))
@@ -65,7 +70,10 @@ namespace VC3EYE.Data
                 throw new ArgumentException("Search term cannot be empty.", nameof(searchTerm));
             }
 
-            var serviceSearch = _db.Services.Where(s => s.ServiceName.ToLower().Contains(searchTerm.ToLower()) && s.IsActive == true && s.IsDeleted == false).ToList();
+            var serviceSearch = _db.Services
+                .Include(s => s.ServiceDownHistories)
+                .Where(s => s.ServiceName.ToLower().Contains(searchTerm.ToLower()) && s.IsActive == true && s.IsDeleted == false)
+                .ToList();
 
             return serviceSearch;
         }
@@ -205,6 +213,17 @@ namespace VC3EYE.Data
             return updated;
         }
 
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            return _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task AddServiceDownHistoryAsync(ServiceDownHistory history, CancellationToken cancellationToken = default)
+        {
+            _db.ServiceDownHistories.Add(history);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         /// <summary>
         /// Check RSS Feeds of the Service
         /// </summary>
@@ -307,7 +326,7 @@ namespace VC3EYE.Data
         /// Check Service URL status through the HTTPClient and Page content - NO LOOP
         /// </summary>
         /// <param name="s">Checking Service</param>
-        public async Task<HttpCheckResult> CheckHttp(object? state, Service s)
+        public async Task<HttpCheckResult> CheckHttp(object? state, Service s, CancellationToken cancellationToken = default)
         {
             if (s?.Url == null || !Uri.TryCreate(s.Url, UriKind.Absolute, out var uri) ||
                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
@@ -316,25 +335,23 @@ namespace VC3EYE.Data
             var timer = Stopwatch.StartNew();
             try
             {
-                using var response = await MonitoringHttpClient.GetAsync(uri, HttpCompletionOption.ResponseContentRead);
-                var body = await response.Content.ReadAsStringAsync();
+                using var response = await MonitoringHttpClient.GetAsync(uri, HttpCompletionOption.ResponseContentRead, cancellationToken);
                 timer.Stop();
                 var status = (int)response.StatusCode;
+                // This check measures service availability, not page correctness.
+                // Sites may return access-denied pages or vary their HTML based on
+                // the request source, so a configured lookup term must not mark an
+                // otherwise responding service as down.
                 var reachable = status < 500;
                 var message = $"HTTP {status} {response.ReasonPhrase}";
-                // A block or rate limit proves the host is reachable. Don't treat its
-                // challenge page as a missing application keyword.
-                if (status == 403 || status == 429)
-                {
-                    message += " (reachable; request may be blocked or rate-limited; content check skipped)";
-                    return new HttpCheckResult(true, status, message, response.RequestMessage?.RequestUri?.ToString(), timer.ElapsedMilliseconds, null);
-                }
-                if (!string.IsNullOrWhiteSpace(s.LookupTerm) && !body.Contains(s.LookupTerm, StringComparison.OrdinalIgnoreCase))
-                    return new HttpCheckResult(false, status, message + "; expected content was not found", response.RequestMessage?.RequestUri?.ToString(), timer.ElapsedMilliseconds, null);
+                if (status is 403 or 429)
+                    message += " (host reachable; request blocked or rate-limited)";
                 return new HttpCheckResult(reachable, status, message, response.RequestMessage?.RequestUri?.ToString(), timer.ElapsedMilliseconds, null);
             }
             catch (TaskCanceledException ex)
             {
+                if (cancellationToken.IsCancellationRequested)
+                    throw;
                 timer.Stop();
                 return new HttpCheckResult(false, null, "HTTP request timed out", uri.ToString(), timer.ElapsedMilliseconds, ex.Message);
             }
@@ -380,42 +397,30 @@ namespace VC3EYE.Data
         /// <param name="s">Checking Service</param>
         public async Task<bool> CheckHTTPContent(object? state, Service s)
         {
-            //get meta info
-            if (s == null || s.Url == null || s.LookupTerm == null) { return false; }
-            string url = s.Url;
-            string stringLookup = s.LookupTerm;
+            if (s == null || string.IsNullOrWhiteSpace(s.Url) || string.IsNullOrWhiteSpace(s.LookupTerm))
+                return false;
 
-            bool success = false;
+            if (!Uri.TryCreate(s.Url, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                return false;
 
-            // Check if the URL is valid
-            if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uriResult)
-                && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps))
+            try
             {
-                // Create a new instance of HttpClient, which will be reused for all requests
-                using (HttpClient client = new HttpClient())
-                {
-                    try
-                    {
-                        // Create an HttpClient instance to download the HTML content of the website
-                        HttpClient clientHttp = new HttpClient();
-                        string htmlContent = await client.GetStringAsync(url);
+                using var response = await MonitoringHttpClient.GetAsync(uri, HttpCompletionOption.ResponseContentRead);
+                if (!response.IsSuccessStatusCode)
+                    return false;
 
-                        //Console.WriteLine(htmlContent);
-
-                        success = htmlContent.IndexOf(s.LookupTerm, StringComparison.OrdinalIgnoreCase) >= 0;
-
-                        return success;
-                    }
-                    catch
-                    {
-                        //return flag for this check
-                        return false;
-                    }
-                }
+                var html = await response.Content.ReadAsStringAsync();
+                return html.Contains(s.LookupTerm, StringComparison.OrdinalIgnoreCase);
             }
-
-            //end flag of the URI check
-            else return success;
+            catch (HttpRequestException)
+            {
+                return false;
+            }
+            catch (TaskCanceledException)
+            {
+                return false;
+            }
         }
 
         /// <summary>
@@ -466,7 +471,7 @@ namespace VC3EYE.Data
         /// <param name="state"></param>
         /// <param name="s"></param>
         /// <returns></returns>
-        public async Task<bool> CheckPort(object? state, Service s)
+        public async Task<bool> CheckPort(object? state, Service s, CancellationToken cancellationToken = default)
         {
             //null check
             if (s == null) return false;
@@ -487,7 +492,7 @@ namespace VC3EYE.Data
                 //resolve ip from either ip or URL
                 if (!string.IsNullOrEmpty(s.Ipaddress))
                 {
-                    ipAddress = await Dns.GetHostEntryAsync(s.Ipaddress).ConfigureAwait(false);
+                    ipAddress = await Dns.GetHostEntryAsync(s.Ipaddress, cancellationToken).ConfigureAwait(false);
                     ipCheck = ipAddress.AddressList[0];
                 }
 
@@ -499,7 +504,7 @@ namespace VC3EYE.Data
                     //if uri is valid, process convert
                     if (Uri.TryCreate(s.Url, UriKind.Absolute, out uri))
                     {
-                        IPAddress[] addresses = await Dns.GetHostAddressesAsync(uri.Host);
+                        IPAddress[] addresses = await Dns.GetHostAddressesAsync(uri.Host, cancellationToken);
                         if (addresses.Length > 0)
                         {
                             ipCheck = addresses[0];
@@ -519,9 +524,13 @@ namespace VC3EYE.Data
 
                 using (var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
                 {
-                    await socket.ConnectAsync(endPoint).ConfigureAwait(false);
+                    await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
                     return socket.Connected;
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {
@@ -635,68 +644,48 @@ namespace VC3EYE.Data
 
         public bool CheckICMP(Service s)
         {
-            //run
+            // ICMP is informational: DNS and ping failures are ordinary negative
+            // results and should not be recorded as application errors.
             try
             {
-                if (!string.IsNullOrEmpty(s.Url))
-                {
-                    // uri check
-                    Uri? uri;
-                    if (Uri.TryCreate(s.Url, UriKind.Absolute, out uri))
-                    {
-                        IPAddress[] addresses = Dns.GetHostAddresses(uri.Host);
-                        if (addresses.Length > 0)
-                        {
-                            // use the first IP address returned by DNS
-                            var ipAddress = addresses[0];
+                IPAddress? address = null;
 
-                            // ICMP check
-                            using (var ping = new Ping())
-                            {
-                                // validate IP address
-                                if (IPAddress.TryParse(ipAddress.ToString(), out IPAddress validIpAddress))
-                                {
-                                    var reply = ping.Send(validIpAddress);
-                                    s.IsIcmpRunning = reply.Status == IPStatus.Success;
-                                }
-                                else
-                                {
-                                    s.IsIcmpRunning = false;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            s.IsIcmpRunning = false;
-                        }
-                    }
+                if (!string.IsNullOrWhiteSpace(s.Ipaddress) && IPAddress.TryParse(s.Ipaddress, out var configuredAddress))
+                {
+                    address = configuredAddress;
+                }
+                else if (!string.IsNullOrWhiteSpace(s.Url) && Uri.TryCreate(s.Url, UriKind.Absolute, out var uri) &&
+                         (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                {
+                    // Prefer IPv4 where available; some targets publish IPv6
+                    // addresses the monitoring host cannot route or ping.
+                    var addresses = Dns.GetHostAddresses(uri.Host);
+                    address = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)
+                        ?? addresses.FirstOrDefault();
                 }
 
-                else if (!string.IsNullOrEmpty(s.Ipaddress) && Regex.IsMatch(s.Ipaddress, @"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"))
-                {
-                    // IP address check
-                    if (IPAddress.TryParse(s.Ipaddress, out IPAddress validIpAddress))
-                    {
-                        // ICMP check
-                        using (var ping = new Ping())
-                        {
-                            var reply = ping.Send(validIpAddress);
-                            s.IsIcmpRunning = reply.Status == IPStatus.Success;
-                        }
-                    }
-                    else
-                    {
-                        s.IsIcmpRunning = false;
-                    }
-                }
-                else
+                if (address == null)
                 {
                     s.IsIcmpRunning = false;
+                    return false;
                 }
-            }
 
+                using var ping = new Ping();
+                var reply = ping.Send(address, 3000);
+                s.IsIcmpRunning = reply.Status == IPStatus.Success;
+            }
+            catch (SocketException)
+            {
+                // DNS resolution or network lookup failed; ICMP remains informational.
+                s.IsIcmpRunning = false;
+            }
+            catch (PingException)
+            {
+                s.IsIcmpRunning = false;
+            }
             catch (Exception ex)
             {
+                s.IsIcmpRunning = false;
                 var lm = new LogsManager(_db);
                 var errLog = new ErrorLog()
                 {

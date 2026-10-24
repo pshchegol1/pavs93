@@ -23,12 +23,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 });
 
 builder.Services.AddDbContext<Vc3eyeContext>(options =>
-  options.UseSqlServer(builder.Configuration.GetConnectionString("VC3EYEDB")), ServiceLifetime.Singleton);
+  options.UseSqlServer(builder.Configuration.GetConnectionString("VC3EYEDB")));
 
 builder.Services.AddScoped<LogsManager>();
 builder.Services.AddScoped<Service>();
 builder.Services.AddScoped<ServiceManager>();
-builder.Services.AddScoped<ServicesThread>();
 builder.Services.AddScoped<ServiceController>();
 builder.Services.AddScoped<IndexModel>();
 

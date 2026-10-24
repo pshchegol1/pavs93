@@ -130,10 +130,18 @@ namespace VC3EYE.Pages
 
             try
             {
+                if (s == null)
+                {
+                    TempData["CheckAlertType"] = "danger";
+                    TempData["CheckAlertMessage"] = "The selected service could not be found, so its status was not checked.";
+                    return RedirectToPage("ServicesList");
+                }
+
                 //thread
                 Tuple<ServiceManager, Service> obj = new Tuple<ServiceManager, Service>(sm, s);
 
-               await OneCheck(obj);
+                await OneCheck(obj);
+                SetCheckAlert(s, "Availability check");
             }
             catch (Exception ex)
             {
@@ -146,10 +154,12 @@ namespace VC3EYE.Pages
                 };
 
                 lm.AddErrorLog(errLog);
+                TempData["CheckAlertType"] = "danger";
+                TempData["CheckAlertMessage"] = "The availability check failed before a service result could be saved.";
             }
 
             //reload page
-            return RedirectToPage("ServicesList", new { @m = "checked" });
+            return RedirectToPage("ServicesList");
         }
 
         public async Task<IActionResult> OnPostLookUp(int serviceid)
@@ -161,9 +171,17 @@ namespace VC3EYE.Pages
 
             try
             {
+                if (s == null)
+                {
+                    TempData["CheckAlertType"] = "danger";
+                    TempData["CheckAlertMessage"] = "The selected service could not be found, so its status was not checked.";
+                    return RedirectToPage("ServicesList");
+                }
+
                 //thread
                 Tuple<ServiceManager, Service> obj = new Tuple<ServiceManager, Service>(sm, s);
                 await LookUpCheck(obj);
+                SetCheckAlert(s, "Page content check");
             }
             catch (Exception ex)
             {
@@ -176,10 +194,12 @@ namespace VC3EYE.Pages
                 };
 
                 lm.AddErrorLog(errLog);
+                TempData["CheckAlertType"] = "danger";
+                TempData["CheckAlertMessage"] = "The page content check failed before a service result could be saved.";
             }
 
             //reload page
-            return RedirectToPage("ServicesList", new { @m = "termchecked" });
+            return RedirectToPage("ServicesList");
 
         }
 
@@ -235,53 +255,36 @@ namespace VC3EYE.Pages
         {
             if (obj is Tuple<ServiceManager, Service> arg)
             {
-                //flag layers
-                bool bLookUp = false;
-
                 ServiceManager sm = arg.Item1;
                 Service s = arg.Item2;
+                // This is a content diagnostic only. A missing term (common on
+                // JavaScript-rendered or bot-protected pages) must not change the
+                // service's availability state or send a false outage notification.
+                var termFound = await sm.CheckHTTPContent(s, s);
+                var result = await sm.CheckHttp(s, s);
+                var isAvailable = result.IsHealthy;
+                if (!isAvailable && s.Port is > 0 && await sm.CheckPort(s, s))
+                    isAvailable = true;
 
-                var stc = new SettingContoller(_db);
-                Setting st = null;
-
-                string sDesc = s.NotificationMessage ?? "";
-
-                lock (sm)
-                    st = stc.GetCurrentSetting();
-
-                System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-                stopwatch.Start();
-
-                bool running = false;
-
-                if (!string.IsNullOrEmpty(s.Url) && !string.IsNullOrEmpty(s.LookupTerm))
-                {
-                    lock (sm)
-                        bLookUp = running = sm.CheckHTTPContent(s, s).Result;
-                }
-
-                //set desc string
-                if (bLookUp)
-                {
-                    sDesc = $"{sDesc} - Keyword Found";
-                }
-                else
-                {
-                    sDesc = $"{sDesc} - Keyword Not Found";
-                }
-
-                //service s
-                s.IsRunning = running;
-                s.LastTimeChecked = DateTime.Now;
-                lock (sm)
-                    sm.ModifyService(s);
-
-                //send notification MS Teams webhook
-                if (!s.IsRunning && st != null) await sm.MSTeamsNotify(st, s);
-
-                stopwatch.Stop();
-                Console.WriteLine("Time: " + stopwatch.ElapsedMilliseconds);
+                var contentStatus = string.IsNullOrWhiteSpace(s.LookupTerm)
+                    ? "content check skipped: no lookup term configured"
+                    : termFound ? $"content check: '{s.LookupTerm}' found" : $"content check: '{s.LookupTerm}' not found";
+                var availabilityStatus = $"availability check: {(isAvailable ? "reachable" : "unreachable")}";
+                var diagnostic = $"{contentStatus}; {availabilityStatus}; {result.Message}";
+                sm.ApplyCheckResult(s, isAvailable, diagnostic, recoveryChecks: 1);
+                sm.ModifyService(s);
             }
+        }
+
+        private void SetCheckAlert(Service service, string checkName)
+        {
+            var status = service.IsRunning ? "RUNNING" : "DOWN";
+            var detail = string.IsNullOrWhiteSpace(service.NotificationMessage)
+                ? "No diagnostic details are available."
+                : service.NotificationMessage;
+
+            TempData["CheckAlertType"] = service.IsRunning ? "success" : "danger";
+            TempData["CheckAlertMessage"] = $"{checkName} complete: {service.ServiceName} is {status}. {detail}";
         }
     }
 }

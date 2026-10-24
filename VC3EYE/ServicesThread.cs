@@ -1,148 +1,163 @@
-﻿using VC3EYE.Data;
+using Microsoft.EntityFrameworkCore;
+using VC3EYE.Data;
 using VC3EYE.Entities;
 
 namespace VC3EYE
 {
     public class ServicesThread : BackgroundService
     {
-        private readonly Vc3eyeContext _db;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<ServicesThread> _logger;
 
-        public ServicesThread(Vc3eyeContext db, ILogger<ServicesThread> logger)
+        private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(1);
+        private const int MaxConcurrentChecks = 4;
+
+        public ServicesThread(IServiceScopeFactory scopeFactory, ILogger<ServicesThread> logger)
         {
-            _db = db;
+            _scopeFactory = scopeFactory;
             _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                while (!stoppingToken.IsCancellationRequested)
+                try
                 {
-                    _logger.LogInformation("ServicesThread is running at: {time}", DateTimeOffset.Now);
-                    System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-                    stopwatch.Start();
+                    await CheckDueServicesAsync(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // Keep the hosted worker alive if one polling pass fails.
+                    _logger.LogError(ex, "Service monitoring pass failed");
+                }
 
-                    CheckServices();
-
-                    stopwatch.Stop();
-                    Console.WriteLine("Check services: " + stopwatch.ElapsedMilliseconds);
-                    stopwatch.Reset();
-                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+                try
+                {
+                    await Task.Delay(PollInterval, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
                 }
             }
-            catch (Exception ex)
-            {
-                var lm = new LogsManager(_db);
-                var errLog = new ErrorLog()
-                {
-                    ErrorName = "Failed to ExecuteAsync in Services Thread",
-                    ErrorDescription = ex.Message,
-                    DateAdded = DateTime.Now
-                };
-
-                lm.AddErrorLog(errLog);
-            }
         }
-        private Thread _ServiceCheckThread = null;
 
-        private void CheckServices()
+        private async Task CheckDueServicesAsync(CancellationToken stoppingToken)
         {
-            try
+            List<int> dueServiceIds;
+            using (var scope = _scopeFactory.CreateScope())
             {
-                var sm = new ServiceManager(_db);
-                var services = sm.GetAllServices();
+                var db = scope.ServiceProvider.GetRequiredService<Vc3eyeContext>();
+                var now = DateTime.Now;
+                var services = await db.Services
+                    .Where(s => s.IsActive && !s.IsDeleted)
+                    .Select(s => new { s.ServiceId, s.LastTimeChecked, s.CheckInterval })
+                    .ToListAsync(stoppingToken);
 
-                if (services.Count() > 0)
+                dueServiceIds = services
+                    .Where(s => s.LastTimeChecked + s.CheckInterval <= now)
+                    .Select(s => s.ServiceId)
+                    .ToList();
+            }
+
+            if (dueServiceIds.Count == 0)
+                return;
+
+            await Parallel.ForEachAsync(
+                dueServiceIds,
+                new ParallelOptions
                 {
-                    foreach (var s in services)
+                    CancellationToken = stoppingToken,
+                    MaxDegreeOfParallelism = MaxConcurrentChecks
+                },
+                async (serviceId, cancellationToken) =>
+                {
+                    // Each check gets its own scope and DbContext. DbContext is
+                    // not thread-safe, so no context or tracked entity is shared.
+                    using var scope = _scopeFactory.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<Vc3eyeContext>();
+                    var manager = new ServiceManager(db);
+                    try
                     {
-                        if (s.LastTimeChecked.AddMinutes(s.CheckInterval.TotalMinutes) < DateTime.Now)
-                        {
-                            Tuple<ServiceManager, Service> obj = new Tuple<ServiceManager, Service>(sm, s);
-                            _ServiceCheckThread = new Thread(new ParameterizedThreadStart(Checks));
-                            _ServiceCheckThread.IsBackground = true;
-                            _ServiceCheckThread.Start(obj);
-                        }
+                        var service = await manager.GetServiceByIDAsync(serviceId, cancellationToken);
+                        if (service == null || !service.IsActive || service.IsDeleted)
+                            return;
 
+                        await CheckServiceAsync(manager, service, cancellationToken);
                     }
-                }
-            }
-            catch (Exception ex)
-            {
-                var lm = new LogsManager(_db);
-                var errLog = new ErrorLog()
-                {
-                    ErrorName = "Failed to Check Services in Services Thread",
-                    ErrorDescription = ex.Message,
-                    DateAdded = DateTime.Now
-                };
-
-                lm.AddErrorLog(errLog);
-            }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Health check failed for service {ServiceId}", serviceId);
+                    }
+                });
         }
 
-        private void Checks(object obj)
+        private async Task CheckServiceAsync(ServiceManager manager, Service service, CancellationToken cancellationToken)
         {
-            if (obj is Tuple<ServiceManager, Service> arg)
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var http = string.IsNullOrWhiteSpace(service.Url)
+                ? new HttpCheckResult(false, null, "No URL configured", null, 0, null)
+                : await manager.CheckHttp(service, service, cancellationToken);
+
+            var running = http.IsHealthy;
+            var portCheck = false;
+            if (!running && service.Port is > 0)
             {
-                ServiceManager sm = arg.Item1;
-                Service s = arg.Item2;
-
-                string HTMLResponseCheck = "";
-                bool PortCheck = false;
-                bool RSSCheck = false;
-                bool PingCheck = false;
-
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                var http = string.IsNullOrWhiteSpace(s.Url)
-                    ? new HttpCheckResult(false, null, "No URL configured", null, 0, null)
-                    : sm.CheckHttp(s, s).GetAwaiter().GetResult();
-                HTMLResponseCheck = http.Message + (http.Error == null ? "" : ": " + http.Error);
-                bool running = http.IsHealthy;
-                string sDesc = $"{http.Message}; {http.ElapsedMilliseconds} ms";
-
-                if (!running && s.Port is > 0)
-                {
-                    PortCheck = sm.CheckPort(s, s).GetAwaiter().GetResult();
-                    running = PortCheck;
-                    sDesc += PortCheck ? "; TCP port reachable" : "; TCP port failed";
-                }
-
-                //ICMP
-                if (!string.IsNullOrEmpty(s.Url) || !string.IsNullOrEmpty(s.Ipaddress))
-                {
-                    s.IsIcmpRunning = sm.CheckICMP(s);
-                }
-                PingCheck = s.IsIcmpRunning;
-
-                //set desc string
-                if (s.IsIcmpRunning)
-                    sDesc = $"{sDesc}; ICMP passed";
-                else
-                    sDesc = $"{sDesc}; ICMP failed (informational)";
-
-                var wasRunning = s.IsRunning;
-                sm.ApplyCheckResult(s, running, sDesc);
-                lock (sm) sm.ModifyService(s);
-                if (wasRunning && !s.IsRunning)
-                {
-                    var sdh = new ServiceDownHistoryManager(_db);
-                    sdh.AddServiceDownHistory(new ServiceDownHistory { ServiceId = s.ServiceId, DateAdded = DateTime.Now,
-                        Htmlresponse = HTMLResponseCheck, ResponseTime = TimeSpan.FromMilliseconds(http.ElapsedMilliseconds),
-                        IsPingFailed = !PingCheck, IsPortFailed = s.Port.HasValue && !PortCheck, IsRssfeedFailed = RSSCheck });
-                }
-                else if (!wasRunning && s.IsRunning && s.ServiceDownHistories.Count > 0)
-                {
-                    s.ServiceDownHistories.Last().BackUpDateTime = DateTime.Now;
-                    lock (sm) sm.ModifyService(s);
-                }
-
-                stopwatch.Stop();
-                Console.WriteLine("Time: " + stopwatch.ElapsedMilliseconds + " " + running + " " + s.ServiceName);
+                portCheck = await manager.CheckPort(service, service, cancellationToken);
+                running = portCheck;
             }
-        }
 
+            service.IsIcmpRunning = manager.CheckICMP(service);
+            var wasRunning = service.IsRunning;
+            var description = $"{http.Message}; {http.ElapsedMilliseconds} ms";
+            if (http.Error != null)
+                description += $": {http.Error}";
+            if (service.Port is > 0)
+                description += portCheck ? "; TCP port reachable" : "; TCP port failed";
+            description += service.IsIcmpRunning ? "; ICMP passed" : "; ICMP failed (informational)";
+
+            manager.ApplyCheckResult(service, running, description);
+            await manager.SaveChangesAsync(cancellationToken);
+
+            if (wasRunning && !service.IsRunning)
+            {
+                var history = new ServiceDownHistory
+                {
+                    ServiceId = service.ServiceId,
+                    DateAdded = DateTime.Now,
+                    Htmlresponse = http.Message + (http.Error == null ? "" : ": " + http.Error),
+                    ResponseTime = TimeSpan.FromMilliseconds(http.ElapsedMilliseconds),
+                    IsPingFailed = !service.IsIcmpRunning,
+                    IsPortFailed = service.Port.HasValue && !portCheck,
+                    IsRssfeedFailed = false
+                };
+                await manager.AddServiceDownHistoryAsync(history, cancellationToken);
+            }
+            else if (!wasRunning && service.IsRunning)
+            {
+                var openHistory = service.ServiceDownHistories
+                    .Where(h => h.BackUpDateTime == null)
+                    .OrderByDescending(h => h.DateAdded)
+                    .FirstOrDefault();
+                if (openHistory != null)
+                {
+                    openHistory.BackUpDateTime = DateTime.Now;
+                    await manager.SaveChangesAsync(cancellationToken);
+                }
+            }
+
+            stopwatch.Stop();
+            _logger.LogInformation("Checked {ServiceName} ({ServiceId}) in {ElapsedMilliseconds} ms: {IsRunning}",
+                service.ServiceName, service.ServiceId, stopwatch.ElapsedMilliseconds, running);
+        }
     }
 }

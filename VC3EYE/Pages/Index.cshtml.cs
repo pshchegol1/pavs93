@@ -50,7 +50,6 @@ namespace VC3EYE.Pages
             if (!ModelState.IsValid)
             {
                 services = sc.GetCurrentServices().OrderBy(service => service.IsRunning).ThenBy(service => !service.IsImportant).ToList(); 
-                search = "";
                 return Page();
             }
            
@@ -58,8 +57,6 @@ namespace VC3EYE.Pages
             services = sc.GetServiceBySearch(search).OrderBy(service => service.IsRunning).ThenBy(service => !service.IsImportant).ToList();
 
             IsFiltered = true;
-
-            search = "";
 
             return Page();
         }

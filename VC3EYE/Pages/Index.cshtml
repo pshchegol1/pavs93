@@ -1,304 +1,184 @@
-﻿@page
+@page
 @model IndexModel
+@using VC3EYE.Data;
 @{
-    ViewData["Title"] = "Home page";
-
-    int runningServices = Model.services.Where(x => x.IsRunning).ToList().Count;
-    int downServices = Model.services.Where(x => !x.IsRunning).ToList().Count;
-    var time = new TimeSpan();
-    string filtered = (Model.IsFiltered) ? "Filtered" : "";
-    string? location = Request.Query["location"];
-
-    DateTime beginningOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
-    DateTime currentDate = DateTime.Now;
-    int daysInMonth = DateTime.DaysInMonth(currentDate.Year, currentDate.Month) + 1;
-    string month = beginningOfMonth.ToString("MMMM");
+    ViewData["Title"] = "Home";
+    var services = Model.services ?? new List<VC3EYE.Entities.Service>();
+    var activeServices = services.Where(x => x.IsActive && !x.IsDeleted).ToList();
+    var runningServices = activeServices.Count(x => x.IsRunning);
+    var downServices = activeServices.Count - runningServices;
+    var healthPercent = activeServices.Count == 0 ? 100 : (int)Math.Round((double)runningServices / activeServices.Count * 100);
+    var location = Request.Query["location"].ToString();
+    var today = DateTime.Today;
+    var recentDays = Enumerable.Range(0, 14).Select(offset => today.AddDays(offset - 13)).ToList();
+    var recentInterruptions = activeServices
+        .SelectMany(service => service.ServiceDownHistories.Select(history => new { Service = service, History = history }))
+        .OrderByDescending(item => item.History.DateAdded)
+        .Take(6)
+        .ToList();
+    var lastChecked = activeServices.Count == 0 ? (DateTime?)null : activeServices.Max(service => service.LastTimeChecked);
 }
 
-<div class="border-1 mt-4">
-    <br />
-    <!--will hold the services and populate the status for each service available in the Database-->
-    <form method="post" class="form-inline" asp-page-handler="Search">
-        <div class="search-container">
-            <div class="row">
-                <div class="col-6">
-                    <div class="input-group mb-3">
-                        <input type="text" class="form-control" placeholder="Search Services" name="search" asp-for="search">
-                        <button class="btn btn-dark" title="Search Services" type="submit" id="button-addon2"><i class="bi bi-search"></i></button>
+<div class="home-dashboard">
+    <header class="home-heading">
+        <div>
+            <div class="home-eyebrow"><i class="bi bi-stars"></i> VC3EYE MONITORING</div>
+            <h1>Your services, at a glance</h1>
+            <p>A live overview of endpoint health and recent interruptions.</p>
+        </div>
+        <div class="home-updated">
+            <span class="home-live-dot"></span>
+            <span>Last check</span>
+            <strong>@(lastChecked.HasValue ? lastChecked.Value.ToString("MMM d · h:mm tt") : "Waiting for first check")</strong>
+        </div>
+    </header>
 
-                    </div>
-                    <span asp-validation-for="search" name="search" type="text" id="servicesearch" name="service" class="text-danger"></span>
-                </div>
-                <div class="col-6">
-                    <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuLocations" data-bs-toggle="dropdown" aria-expanded="false" style="width:100%;">
-                            Locations
-                        </button>
-                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuLocations" style="width:100%;">
-                            @if (Model.Locations != null && Model.Locations.Count > 0)
-                            {
-                                foreach (string l in Model.Locations)
-                                {
-                                    <li><a class="dropdown-item" asp-route-location="@l.ToLower()">@l.ToUpper()</a></li>
-                                }
-                            }
-                        </ul>
-                    </div>
+    <section class="home-hero" aria-label="Fleet health summary">
+        <div class="home-health-card">
+            <div class="home-health-copy">
+                <span class="home-card-kicker">FLEET HEALTH</span>
+                <h2>@(downServices == 0 ? "Everything looks good" : $"{downServices} service{(downServices == 1 ? " needs" : "s need")} attention")</h2>
+                <p>@runningServices of @activeServices.Count monitored services are currently running.</p>
+                <a class="home-primary-link" asp-page="/ServicesList">Open service manager <i class="bi bi-arrow-up-right"></i></a>
+            </div>
+            <div class="home-health-gauge" style="--health-rate:@healthPercent%" role="img" aria-label="@healthPercent percent of services are running">
+                <div class="home-health-gauge-inner">
+                    <strong>@healthPercent<span>%</span></strong>
+                    <small>healthy</small>
                 </div>
             </div>
         </div>
-    </form>
-    <hr />
-    <div class="d-flex">
-        @if (runningServices > 0)
-        {
-            <div class="card services-up" style="width: 110px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of services running">
-                <div class="card-header d-flex justify-content-between">
-                    <span><i class="bi bi-arrow-up-circle-fill"></i></span>
-                    <span><b>@runningServices</b></span>
-                </div>
-            </div>
-        }
-        @if (downServices > 0)
-        {
-            <div class="card services-down ms-3" style="width: 110px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of services down">
-                <div class="card-header d-flex justify-content-between">
-                    <span><i class="bi bi-arrow-down-circle-fill"></i></span>
-                    <span><b>@downServices</b></span>
-                </div>
-            </div>
-        }
-    </div>
+        <div class="home-metrics">
+            <article class="home-metric home-metric-total">
+                <span class="home-metric-icon"><i class="bi bi-hdd-stack"></i></span>
+                <div><span>Monitored</span><strong>@activeServices.Count</strong><small>active services</small></div>
+            </article>
+            <article class="home-metric home-metric-up">
+                <span class="home-metric-icon"><i class="bi bi-check2"></i></span>
+                <div><span>Running</span><strong>@runningServices</strong><small>responding now</small></div>
+            </article>
+            <article class="home-metric home-metric-down">
+                <span class="home-metric-icon"><i class="bi bi-exclamation-lg"></i></span>
+                <div><span>Down</span><strong>@downServices</strong><small>@(downServices == 0 ? "all clear" : "check required")</small></div>
+            </article>
+        </div>
+    </section>
 
-    <div class="mt-lg-4 table-reponsive main-table-content">
+    <section class="home-fleet-section">
+        <div class="home-section-heading">
+            <div>
+                <div class="home-section-kicker">MONITORED ENDPOINTS</div>
+                <h2>Service fleet</h2>
+            </div>
+            <div class="home-fleet-controls">
+                <form method="post" class="home-search" asp-page-handler="Search">
+                    <i class="bi bi-search"></i>
+                    <input type="search" placeholder="Find a service" asp-for="search" aria-label="Find a service" />
+                    <button type="submit" aria-label="Search services"><i class="bi bi-arrow-right"></i></button>
+                </form>
+                <div class="dropdown">
+                    <button class="home-location-select dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-geo-alt"></i> @(string.IsNullOrWhiteSpace(location) ? "Everywhere" : location)
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" asp-page="/Index">Everywhere</a></li>
+                        @foreach (var item in Model.Locations ?? new List<string>())
+                        {
+                            <li><a class="dropdown-item" asp-page="/Index" asp-route-location="@item">@item</a></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+
         @if (Model.IsFiltered)
         {
-            <h4><span class="badge bg-dark">@filtered</span></h4>
+            <div class="home-filter-note"><i class="bi bi-funnel"></i> Showing filtered services</div>
         }
-        @if (!string.IsNullOrEmpty(location))
+
+        @if (downServices > 0)
         {
-            <h4><span class="badge bg-dark">Results for @location.ToUpper()</span></h4>
-        }
-        <table class="table  table-bordered table-hover">
-            <tbody>
-                @if (Model.services != null && Model.services.Any())
-                {
-                    @foreach (var service in Model.services)
+            <section class="home-attention-panel" aria-label="Services needing attention">
+                <div class="home-attention-heading"><span><i class="bi bi-exclamation-triangle-fill"></i></span><div><strong>Needs attention</strong><small>@downServices service@(downServices == 1 ? " is" : "s are") currently down</small></div></div>
+                <div class="home-attention-list">
+                    @foreach (var service in activeServices.Where(x => !x.IsRunning).OrderByDescending(x => x.IsImportant).Take(4))
                     {
-                        //Checking if the service is marked for activly checking and also not deleted
-                        if (service.IsActive || !service.IsDeleted)
-                        {
-                            //Checking if the services is running as intended of flagged as down
-                            if (service.IsRunning)
-                            {
-                                <tr class="services-table table-success">
-                                    <td>
-                                        <a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a>
-                                        <br>
-                                        @if (service.IsRunning)
-                                        {
-                                            <span class="badge bg-success" data-bs-toggle="tooltip" title="Service is running">
-                                                <i class="bi bi-check-circle-fill"></i> Running
-                                            </span>
-                                        }
-                                        else if (service.IsDeleted)
-                                        {
-                                            <span class="badge bg-secondary" data-bs-toggle="tooltip" title="Service is deleted">
-                                                <i class="bi bi-x-circle-fill"></i> Deleted
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-danger" data-bs-toggle="tooltip" title="Service is down">
-                                                <i class="bi bi-exclamation-triangle-fill"></i> Down
-                                            </span>
-                                        }
-                                        <div class="main-down-history d-flex justify-content-between mt-3">
-                                            @for (int i = 1; i < daysInMonth; i++)
-                                            {
-                                                if (service.ServiceDownHistories != null && service.ServiceDownHistories.Count() > 0)
-                                                {
-                                                    foreach (var down in service.ServiceDownHistories)
-                                                    {
-                                                        DateTime da = down.DateAdded;
-                                                        bool matchMonth = (down.DateAdded.Month == currentDate.Month);
-                                                        int d = (da - beginningOfMonth).Days + 1;
-
-                                                        if (i == d && matchMonth)
-                                                        {
-                                                            int timesDown = service.ServiceDownHistories.Where(x => x.DateAdded.Date == down.DateAdded.Date).ToList().Count;
-                                                            string title = "<div class='times-down-con'><span>Down: " + timesDown + " time(s)</span></div>";
-
-                                                            <div class="days-down" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="@month @i @title"></div>
-                                                            i++;
-                                                        }
-                                                    }
-                                                }
-
-                                                if (i <= currentDate.Day)
-                                                {
-                                                    <div class="days-up" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
-                                                }
-                                                else
-                                                {
-                                                    <div class="days-future" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
-                                                }                                             
-                                            }                                          
-                                        </div>
-                                    </td>
-                                    <td>
-                                        Last time checked:<br>
-                                        @service.LastTimeChecked
-                                    </td>
-
-                                    @if (service.ServiceDownHistories.Count() != 0)
-                                    {
-                                        <td>
-                                            Last time Down:<br>
-                                            @service.ServiceDownHistories.Last().BackUpDateTime
-                                        </td>
-
-                                        <td>
-                                            Last time since down:<br>
-                                            @{
-                                                if (service.ServiceDownHistories.Last().BackUpDateTime != null)
-                                                    time = (TimeSpan)(DateTime.Now - service.ServiceDownHistories.Last().BackUpDateTime);
-                                            }
-                                            @(time.Days)D @(time.Hours)H @(time.Minutes)M
-                                        </td>
-                                    }
-                                    else
-                                    {
-                                        <td>
-                                            Last time Down:<br>
-                                            N/A
-                                        </td>
-                                        <td>
-                                            Last time since Down:<br>
-                                            N/A
-                                        </td>
-                                    }
-
-                                    @if (service.NotificationMessage != null)
-                                    {
-
-                                        <td>@service.NotificationMessage</td>
-                                    }
-                                    else
-                                    {
-                                        <td></td>
-                                    }
-                                </tr>
-                            }
-                            else //Downed service
-                            {
-                                <tr class="services-table table-danger">
-                                    <td><a asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a>
-                                        <br>
-                                        @if (service.IsRunning)
-                                        {
-                                            <span class="badge bg-success" data-bs-toggle="tooltip" title="Service is running">
-                                                <i class="bi bi-check-circle-fill"></i> Running
-                                            </span>
-                                        }
-                                        else if (service.IsDeleted)
-                                        {
-                                            <span class="badge bg-secondary" data-bs-toggle="tooltip" title="Service is deleted">
-                                                <i class="bi bi-x-circle-fill"></i> Deleted
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-danger" data-bs-toggle="tooltip" title="Service is down">
-                                                <i class="bi bi-exclamation-triangle-fill"></i> Down
-                                            </span>
-                                        }
-                                        <div class="main-down-history d-flex justify-content-between mt-3">
-                                            @for (int i = 1; i < daysInMonth; i++)
-                                            {
-                                                bool isDayDown = false;
-                                                if (service.ServiceDownHistories != null && service.ServiceDownHistories.Count() > 0)
-                                                {
-                                                    foreach (var down in service.ServiceDownHistories)
-                                                    {
-                                                        DateTime da = down.DateAdded;
-                                                        bool matchMonth = (down.DateAdded.Month == currentDate.Month);
-                                                        int d = (da - beginningOfMonth).Days + 1;
-
-                                                        if (i == d && matchMonth)
-                                                        {
-                                                            int timesDown = service.ServiceDownHistories.Where(x => x.DateAdded.Date == down.DateAdded.Date).ToList().Count;
-                                                            string title = "<div class='times-down-con'><span>Down: " + timesDown + " time(s)</span></div>";
-
-                                                            <div class="days-down bg-danger" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="@month @i @title"></div>
-                                                            isDayDown = true;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-
-                                                if (!isDayDown)
-                                                {
-                                                    if (i <= currentDate.Day)
-                                                    {
-                                                        <div class="days-up" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
-                                                    }
-                                                    else
-                                                    {
-                                                        <div class="days-future" data-bs-toggle="tooltip" data-bs-placement="top" title="@month @i"></div>
-                                                    }
-                                                }
-                                            }
-                                        </div>
-                                    </td>
-                                    <td>
-                                        Last time checked:<br>
-                                        @service.LastTimeChecked
-                                    </td>
-
-                                    @* In the downed service row, update the check for ServiceDownHistories.Count *@
-                                    @if (service.ServiceDownHistories != null && service.ServiceDownHistories.Count != 0)
-                                    {
-                                        <td>
-                                            Last time Down:<br>
-                                            @service.ServiceDownHistories.Last().DateAdded
-                                        </td>
-                                        <td>
-                                            Last time since Down:<br>
-                                            @{
-                                                time = (DateTime.Now - service.ServiceDownHistories.Last().DateAdded);
-                                            }
-                                            @(time.Days)D @(time.Hours)H @(time.Minutes)M
-                                        </td>
-                                    }
-                                    else
-                                    {
-                                        <td>
-                                            Last time Down:<br>
-                                            N/A
-                                        </td>
-                                        <td>
-                                            Last time since Down:<br>
-                                            N/A
-                                        </td>
-                                    }
-
-                                    @if (service.NotificationMessage != null)
-                                    {
-
-                                        <td>@service.NotificationMessage</td>
-                                    }
-                                    else
-                                    {
-                                        <td></td>
-                                    }
-
-                                </tr>
-                            }
-                        }
+                        <a class="home-attention-item" asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">
+                            <span><strong>@service.ServiceName</strong><small>@(string.IsNullOrWhiteSpace(service.NotificationMessage) ? "No diagnostic details" : service.NotificationMessage)</small></span>
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
                     }
+                    @if (downServices > 4)
+                    {
+                        <a class="home-attention-more" asp-page="/ServicesList">View all @downServices down services <i class="bi bi-arrow-right"></i></a>
+                    }
+                </div>
+            </section>
+        }
+        else
+        {
+            <div class="home-all-clear"><span><i class="bi bi-check-circle-fill"></i></span><div><strong>All monitored services are running</strong><small>No active outages detected.</small></div><i class="bi bi-stars home-clear-sparkle"></i></div>
+        }
+
+        @if (activeServices.Any())
+        {
+            <div class="home-service-grid">
+                @foreach (var service in activeServices.OrderBy(x => x.IsRunning).ThenByDescending(x => x.IsImportant).ThenBy(x => x.ServiceName))
+                {
+                    var incidentDates = service.ServiceDownHistories.Select(x => x.DateAdded.Date).ToHashSet();
+                    var endpoint = string.IsNullOrWhiteSpace(service.Url) ? service.Ipaddress : service.Url;
+                    var statusClass = service.IsRunning ? "is-running" : "is-down";
+                    <article class="home-service-card @(service.IsRunning ? "home-card-running" : "home-card-down")">
+                        <div class="home-service-topline">
+                            <span class="home-service-avatar"><i class="bi bi-hdd-network"></i></span>
+                            <span class="status-pill @statusClass"><span class="status-dot"></span>@(service.IsRunning ? "Running" : "Down")</span>
+                        </div>
+                        <a class="home-service-title" asp-page="/ServiceInfo" asp-route-serviceid="@service.ServiceId">@service.ServiceName</a>
+                        <div class="home-service-location"><i class="bi bi-geo-alt"></i> @service.Location</div>
+                        <div class="home-service-endpoint" title="@endpoint">@(string.IsNullOrWhiteSpace(endpoint) ? "No endpoint configured" : endpoint)</div>
+                        <div class="home-service-detail">
+                            <span><i class="bi bi-clock-history"></i> Checked @service.LastTimeChecked.ToString("h:mm tt")</span>
+                            <span class="home-service-diagnostic" title="@service.NotificationMessage">@(string.IsNullOrWhiteSpace(service.NotificationMessage) ? "No check details yet" : service.NotificationMessage)</span>
+                        </div>
+                        <div class="home-incident-strip" aria-label="Incident days over the last 14 days">
+                            @foreach (var day in recentDays)
+                            {
+                                var hadIncident = incidentDates.Contains(day.Date);
+                                <span class="@(hadIncident ? "incident-day" : "clear-day")" title="@day.ToString("MMM d")@(hadIncident ? " · incident recorded" : " · no incident recorded")"></span>
+                            }
+                        </div>
+                        <div class="home-strip-caption"><span>LAST 14 DAYS</span><span>@service.ServiceDownHistories.Count incident@(service.ServiceDownHistories.Count == 1 ? "" : "s") recorded</span></div>
+                    </article>
                 }
-            </tbody>
-        </table>
-    </div>
+            </div>
+        }
+        else
+        {
+            <div class="home-empty-state"><span><i class="bi bi-hdd-stack"></i></span><strong>No services to show</strong><p>Add a service or change your search and location filters.</p></div>
+        }
+    </section>
+
+    <section class="home-interruptions-section">
+        <div class="home-section-heading home-interruptions-heading">
+            <div><div class="home-section-kicker">RECENT ACTIVITY</div><h2>Recent interruptions</h2></div>
+            <a asp-page="/ServicesList">View services <i class="bi bi-arrow-right"></i></a>
+        </div>
+        @if (recentInterruptions.Any())
+        {
+            <div class="home-interruptions-list">
+                @foreach (var item in recentInterruptions)
+                {
+                    <a class="home-interruption" asp-page="/ServiceInfo" asp-route-serviceid="@item.Service.ServiceId">
+                        <span class="home-interruption-icon @(item.History.BackUpDateTime.HasValue ? "interruption-recovered" : "interruption-open")"><i class="bi @(item.History.BackUpDateTime.HasValue ? "bi-arrow-counterclockwise" : "bi-exclamation-lg")"></i></span>
+                        <span class="home-interruption-copy"><strong>@item.Service.ServiceName</strong><small>@(item.History.BackUpDateTime.HasValue ? "Recovered" : "Still down") · @item.History.DateAdded.ToString("MMM d, h:mm tt")</small></span>
+                        <span class="home-interruption-duration">@(item.History.ResponseTime.HasValue ? $"{item.History.ResponseTime.Value.TotalMinutes:F0} min" : "Details")</span>
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="home-no-interruptions"><i class="bi bi-check2-circle"></i> No interruptions have been recorded yet.</div>
+        }
+    </section>
 </div>

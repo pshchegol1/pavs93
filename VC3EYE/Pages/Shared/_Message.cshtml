@@ -1,5 +1,17 @@
 ﻿@{
     string msg = Context.Request.Query["m"];
+    var checkAlertMessage = TempData["CheckAlertMessage"] as string;
+    var checkAlertType = TempData["CheckAlertType"] as string;
+    var checkAlertClass = checkAlertType == "success" ? "alert-success" : "alert-danger";
+    var checkAlertIcon = checkAlertType == "success" ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill";
+}
+
+@if (!string.IsNullOrEmpty(checkAlertMessage))
+{
+    <div class="alert @checkAlertClass alert-dismissible fade show" role="alert">
+        <strong><i class="bi @checkAlertIcon"></i></strong> @checkAlertMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 }
 
 @if (!string.IsNullOrEmpty(msg))
