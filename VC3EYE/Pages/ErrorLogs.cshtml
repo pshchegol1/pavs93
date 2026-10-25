@@ -16,6 +16,12 @@
         <a asp-page="/Logs" class="error-activity-link"><i class="bi bi-journal-text"></i> Activity logs</a>
     </header>
 
+    @if (TempData["ErrorLogMessage"] is string errorLogMessage)
+    {
+        var messageType = TempData["ErrorLogMessageType"]?.ToString() == "success" ? "success" : "warning";
+        <div class="alert alert-@messageType error-delete-feedback" role="status"><i class="bi @(messageType == "success" ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill")"></i> @errorLogMessage</div>
+    }
+
     <section class="error-summary" aria-label="Error totals">
         <article><span class="error-summary-icon"><i class="bi bi-exclamation-triangle"></i></span><div><small>All errors</small><strong>@Model.TotalErrorLogs</strong></div></article>
         <article><span class="error-summary-icon error-archived-icon"><i class="bi bi-archive"></i></span><div><small>Archived</small><strong>@Model.ArchivedErrorLogs</strong></div></article>
@@ -37,7 +43,7 @@
         {
             <div class="error-table-wrap">
                 <table class="error-table">
-                    <thead><tr><th scope="col">Error</th><th scope="col">Details</th><th scope="col">First recorded</th></tr></thead>
+                    <thead><tr><th scope="col">Error</th><th scope="col">Details</th><th scope="col">First recorded</th><th scope="col" class="error-action-heading"><span class="visually-hidden">Actions</span></th></tr></thead>
                     <tbody>
                     @foreach (var log in Model.ErrorLogs)
                     {
@@ -45,6 +51,7 @@
                             <td><span class="error-name"><i class="bi bi-exclamation-circle-fill"></i>@log.ErrorName</span>@if (log.IsArchived) { <span class="error-archived-badge">Archived</span> }</td>
                             <td><pre class="error-description">@log.ErrorDescription</pre></td>
                             <td><time datetime="@log.DateAdded.ToString("O")">@log.DateAdded.ToString("MMM d, yyyy")<small>@log.DateAdded.ToString("h:mm:ss tt")</small></time></td>
+                            <td class="error-action-cell"><button type="button" class="error-delete-button" data-bs-toggle="modal" data-bs-target="#deleteErrorModal" data-error-id="@log.ErrorLogId" data-error-name="@log.ErrorName" aria-label="Delete error log: @log.ErrorName"><i class="bi bi-trash3"></i></button></td>
                         </tr>
                     }
                     </tbody>
@@ -67,4 +74,37 @@
             <div class="error-empty"><span><i class="bi bi-check2-circle"></i></span><h2>@(Model.TotalErrorLogs == 0 ? "No errors recorded" : "No matching errors")</h2><p>@(Model.TotalErrorLogs == 0 ? "The system has not recorded any errors yet." : "Try a different search or change the archived filter.")</p></div>
         }
     </section>
+
+    <div class="modal fade" id="deleteErrorModal" tabindex="-1" aria-labelledby="deleteErrorModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content error-delete-modal">
+                <div class="modal-header"><div><div class="error-eyebrow">CONFIRM DELETION</div><h2 class="modal-title" id="deleteErrorModalTitle">Delete this error log?</h2></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body"><p>This will permanently remove:</p><strong id="deleteErrorName"></strong><p class="error-delete-warning"><i class="bi bi-exclamation-triangle"></i> This action cannot be undone.</p></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="post" asp-page-handler="Delete" id="deleteErrorForm">
+                        <input type="hidden" name="id" id="deleteErrorId" />
+                        <input type="hidden" name="p" value="@Model.CurrentPage" />
+                        <input type="hidden" name="searchTerm" value="@Model.SearchTerm" />
+                        <input type="hidden" name="showArchived" value="@Model.ShowArchived" />
+                        <button type="submit" class="error-confirm-delete"><i class="bi bi-trash3"></i> Delete error</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </main>
+
+@section Scripts {
+    <script>
+        (() => {
+            const modal = document.getElementById('deleteErrorModal');
+            if (!modal) return;
+            modal.addEventListener('show.bs.modal', event => {
+                const trigger = event.relatedTarget;
+                if (!trigger) return;
+                document.getElementById('deleteErrorId').value = trigger.dataset.errorId;
+                document.getElementById('deleteErrorName').textContent = trigger.dataset.errorName;
+            });
+        })();
+    </script>
+}

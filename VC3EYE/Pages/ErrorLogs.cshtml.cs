@@ -54,5 +54,24 @@ namespace VC3EYE.Pages
                 .Take(PageSize)
                 .ToListAsync(cancellationToken);
         }
+
+        public async Task<IActionResult> OnPostDeleteAsync(int id, int p = 1, string? searchTerm = null, bool showArchived = false, CancellationToken cancellationToken = default)
+        {
+            var errorLog = await _db.ErrorLogs.SingleOrDefaultAsync(log => log.ErrorLogId == id, cancellationToken);
+            if (errorLog == null)
+            {
+                TempData["ErrorLogMessage"] = "That error log was already removed or could not be found.";
+                TempData["ErrorLogMessageType"] = "warning";
+            }
+            else
+            {
+                _db.ErrorLogs.Remove(errorLog);
+                await _db.SaveChangesAsync(cancellationToken);
+                TempData["ErrorLogMessage"] = "Error log deleted.";
+                TempData["ErrorLogMessageType"] = "success";
+            }
+
+            return RedirectToPage("/ErrorLogs", new { p, SearchTerm = searchTerm, ShowArchived = showArchived });
+        }
     }
 }
