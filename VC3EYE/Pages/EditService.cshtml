@@ -25,9 +25,9 @@
                 <div class="add-service-grid">
                     <div class="add-service-field"><label asp-for="Service.ServiceName">Service name <b>*</b></label><input asp-for="Service.ServiceName" class="form-control" /><span asp-validation-for="Service.ServiceName" class="add-service-field-error"></span></div>
                     <div class="add-service-field"><label asp-for="Service.Location">Location <b>*</b></label><input asp-for="Service.Location" class="form-control" /><span asp-validation-for="Service.Location" class="add-service-field-error"></span></div>
-                    <div class="add-service-field"><label asp-for="Service.ServiceURL">Service URL</label><input asp-for="Service.ServiceURL" type="text" inputmode="url" class="form-control" placeholder="https://example.com" /><small>Used for HTTP checks. You can use a URL, an IP address, or both.</small><span asp-validation-for="Service.ServiceURL" class="add-service-field-error"></span></div>
+                    <div class="add-service-field"><label asp-for="Service.ServiceURL">Service URL or hostname</label><input asp-for="Service.ServiceURL" type="text" inputmode="url" class="form-control" placeholder="https://example.com" /><small>Enter an HTTP URL for HTTP/API, or a hostname for TCP, DNS, and certificate checks.</small><span asp-validation-for="Service.ServiceURL" class="add-service-field-error"></span></div>
                     <div class="add-service-field"><label asp-for="Service.IPAddress">IP address</label><input asp-for="Service.IPAddress" class="form-control" inputmode="decimal" placeholder="e.g. 192.0.2.10" /></div>
-                    <div class="add-service-field"><label asp-for="Service.Port">Port <span>(optional)</span></label><input asp-for="Service.Port" type="number" class="form-control" min="1" max="65535" /><span asp-validation-for="Service.Port" class="add-service-field-error"></span></div>
+                    <div class="add-service-field service-port-field"><label asp-for="Service.Port">Port <span>(optional; SSL override)</span></label><input asp-for="Service.Port" type="number" class="form-control" min="1" max="65535" /><small class="service-port-help">Optional service port override.</small><span asp-validation-for="Service.Port" class="add-service-field-error"></span></div>
                     <div class="add-service-field"><label asp-for="Service.GeneralInformation">Description <span>(optional)</span></label><textarea asp-for="Service.GeneralInformation" class="form-control" rows="3" placeholder="What does this service do?"></textarea></div>
                 </div>
             </section>
@@ -35,11 +35,25 @@
             <section class="add-service-section">
                 <div class="add-service-section-heading"><span class="add-service-monitor-icon"><i class="bi bi-speedometer2"></i></span><div><h2>Monitoring options</h2><p>Choose how often to check and whether to look for specific content.</p></div></div>
                 <div class="add-service-grid">
+                    <div class="add-service-field">
+                        <label asp-for="Service.MonitorType">Monitor type</label>
+                        <select asp-for="Service.MonitorType" class="form-select" id="monitorTypeSelect">
+                            <option value="0">HTTP availability</option><option value="1">TCP port</option><option value="2">DNS lookup</option><option value="3">SSL certificate</option><option value="4">API endpoint</option>
+                        </select>
+                        <small>Choose what VC3EYE should validate for this service.</small>
+                    </div>
                     <div class="add-service-field"><label asp-for="Service.CheckInterval">Check interval <b>*</b></label><div class="add-service-input-suffix"><input asp-for="Service.CheckInterval" class="form-control" inputmode="numeric" /><span>minutes</span></div><small>How often the background monitor checks this service.</small><span asp-validation-for="Service.CheckInterval" class="add-service-field-error"></span></div>
                     <div class="add-service-field"><label asp-for="Service.NumOfBackup">Backup count <span>(optional)</span></label><input asp-for="Service.NumOfBackup" type="number" class="form-control" min="0" /><small>Number of backup records to retain.</small></div>
                     <div class="add-service-field"><label asp-for="Service.RSSFeedLink">RSS feed URL <span>(optional)</span></label><input asp-for="Service.RSSFeedLink" type="url" class="form-control" placeholder="https://example.com/feed.xml" /><span asp-validation-for="Service.RSSFeedLink" class="add-service-field-error"></span></div>
                     <div class="add-service-field"><label asp-for="Service.LookupTerm">Page content to find <span>(optional)</span></label><input asp-for="Service.LookupTerm" class="form-control" placeholder="A phrase that should appear on the page" /><small>If set, page checks also look for this text.</small><span asp-validation-for="Service.LookupTerm" class="add-service-field-error"></span></div>
+                    <div class="add-service-field monitor-option-ssl"><label asp-for="Service.SslExpiryWarningDays">Certificate expiry warning</label><div class="add-service-input-suffix"><input asp-for="Service.SslExpiryWarningDays" type="number" min="1" max="365" class="form-control" /><span>days</span></div><small>Warning threshold shown in the diagnostic; the service remains healthy until expiry.</small><span asp-validation-for="Service.SslExpiryWarningDays" class="add-service-field-error"></span></div>
                 </div>
+                <div class="monitor-option-api add-service-api-options"><div class="add-service-grid">
+                    <div class="add-service-field"><label asp-for="Service.ApiHttpMethod">API method</label><select asp-for="Service.ApiHttpMethod" class="form-select"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></div>
+                    <div class="add-service-field"><label asp-for="Service.ExpectedStatusCode">Expected status code</label><input asp-for="Service.ExpectedStatusCode" type="number" min="100" max="599" class="form-control" placeholder="200" /><span asp-validation-for="Service.ExpectedStatusCode" class="add-service-field-error"></span></div>
+                    <div class="add-service-field"><label asp-for="Service.ApiExpectedContent">Expected response text <span>(optional)</span></label><input asp-for="Service.ApiExpectedContent" class="form-control" placeholder="A value or phrase in the response" /><span asp-validation-for="Service.ApiExpectedContent" class="add-service-field-error"></span></div>
+                    <div class="add-service-field"><label asp-for="Service.ApiRequestBody">JSON request body <span>(optional)</span></label><textarea asp-for="Service.ApiRequestBody" class="form-control" rows="3" placeholder="{ }"></textarea><small>Used for POST, PUT, and PATCH requests.</small><span asp-validation-for="Service.ApiRequestBody" class="add-service-field-error"></span></div>
+                </div></div>
                 <div class="edit-service-options">
                     <label class="add-service-important"><input asp-for="Service.IsImportant" /><span><strong>Important service</strong><small>Highlight this service in monitoring views.</small></span></label>
                     <label class="add-service-important"><input asp-for="Service.IsInternal" /><span><strong>Internal service</strong><small>Mark this service as available only within your network.</small></span></label>
@@ -63,3 +77,22 @@
         <div class="alert alert-warning" role="alert"><i class="bi bi-exclamation-triangle"></i> This service has been deleted and cannot be edited.</div>
     }
 </main>
+
+@section Scripts {
+    <script>
+        (() => {
+            const selector = document.getElementById('monitorTypeSelect');
+            const update = () => {
+                const type = selector.value;
+                document.querySelectorAll('.monitor-option-ssl').forEach(el => el.hidden = type !== '3');
+                document.querySelectorAll('.monitor-option-api').forEach(el => el.hidden = type !== '4');
+                const portLabel = document.querySelector('label[for="Service_Port"]');
+                const portHelp = document.querySelector('.service-port-help');
+                if (portLabel) portLabel.innerHTML = type === '1' ? 'TCP port <b>*</b>' : 'Port <span>(optional; SSL override)</span>';
+                if (portHelp) portHelp.textContent = type === '1' ? 'Port that must accept a TCP connection.' : 'Optional service port override.';
+            };
+            selector?.addEventListener('change', update);
+            update();
+        })();
+    </script>
+}

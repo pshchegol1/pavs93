@@ -31,9 +31,9 @@
                     <span asp-validation-for="currentService.Location" class="add-service-field-error"></span>
                 </div>
                 <div class="add-service-field">
-                    <label asp-for="currentService.ServiceURL">Service URL</label>
+                    <label asp-for="currentService.ServiceURL">Service URL or hostname</label>
                     <input asp-for="currentService.ServiceURL" type="text" inputmode="url" class="form-control" placeholder="https://example.com" />
-                    <small>Used for HTTP availability checks. Enter a URL or IP address.</small>
+                    <small class="monitor-target-help">Enter an HTTP URL for HTTP/API, or a hostname for TCP, DNS, and certificate checks.</small>
                     <span asp-validation-for="currentService.ServiceURL" class="add-service-field-error"></span>
                 </div>
                 <div class="add-service-field">
@@ -41,9 +41,10 @@
                     <input asp-for="currentService.IPAddress" class="form-control" placeholder="e.g. 192.0.2.10" inputmode="decimal" />
                     <small>Use this when monitoring a host directly.</small>
                 </div>
-                <div class="add-service-field">
+                <div class="add-service-field service-port-field">
                     <label asp-for="currentService.Port">Port <span>(optional)</span></label>
                     <input asp-for="currentService.Port" type="number" class="form-control" placeholder="443" min="1" max="65535" />
+                    <small class="service-port-help">Optional port override; TCP monitors require a port.</small>
                     <span asp-validation-for="currentService.Port" class="add-service-field-error"></span>
                 </div>
                 <div class="add-service-field">
@@ -56,6 +57,17 @@
         <section class="add-service-section">
             <div class="add-service-section-heading"><span class="add-service-monitor-icon"><i class="bi bi-speedometer2"></i></span><div><h2>Monitoring options</h2><p>Set the check cadence and any optional content matching.</p></div></div>
             <div class="add-service-grid">
+                <div class="add-service-field add-service-monitor-type">
+                    <label asp-for="currentService.MonitorType">Monitor type</label>
+                    <select asp-for="currentService.MonitorType" class="form-select" id="monitorTypeSelect">
+                        <option value="0">HTTP availability</option>
+                        <option value="1">TCP port</option>
+                        <option value="2">DNS lookup</option>
+                        <option value="3">SSL certificate</option>
+                        <option value="4">API endpoint</option>
+                    </select>
+                    <small>Choose what VC3EYE should validate for this service.</small>
+                </div>
                 <div class="add-service-field">
                     <label asp-for="currentService.CheckInterval">Check interval <b>*</b></label>
                     <div class="add-service-input-suffix"><input asp-for="currentService.CheckInterval" class="form-control" inputmode="numeric" placeholder="5" /><span>minutes</span></div>
@@ -66,6 +78,20 @@
                     <label asp-for="currentService.NumOfBackup">Backup count <span>(optional)</span></label>
                     <input asp-for="currentService.NumOfBackup" type="number" class="form-control" min="0" placeholder="0" />
                     <small>Number of backup records to retain.</small>
+                </div>
+                <div class="add-service-field monitor-option-ssl">
+                    <label asp-for="currentService.SslExpiryWarningDays">Certificate expiry warning</label>
+                    <div class="add-service-input-suffix"><input asp-for="currentService.SslExpiryWarningDays" type="number" min="1" max="365" class="form-control" /><span>days</span></div>
+                    <small>The certificate remains healthy until it expires; this threshold appears in its diagnostic.</small>
+                    <span asp-validation-for="currentService.SslExpiryWarningDays" class="add-service-field-error"></span>
+                </div>
+                <div class="monitor-option-api add-service-api-options">
+                    <div class="add-service-grid">
+                        <div class="add-service-field"><label asp-for="currentService.ApiHttpMethod">API method</label><select asp-for="currentService.ApiHttpMethod" class="form-select"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></div>
+                        <div class="add-service-field"><label asp-for="currentService.ExpectedStatusCode">Expected status code</label><input asp-for="currentService.ExpectedStatusCode" type="number" min="100" max="599" class="form-control" placeholder="200" /><span asp-validation-for="currentService.ExpectedStatusCode" class="add-service-field-error"></span></div>
+                        <div class="add-service-field"><label asp-for="currentService.ApiExpectedContent">Expected response text <span>(optional)</span></label><input asp-for="currentService.ApiExpectedContent" class="form-control" placeholder="A value or phrase in the response" /><span asp-validation-for="currentService.ApiExpectedContent" class="add-service-field-error"></span></div>
+                        <div class="add-service-field"><label asp-for="currentService.ApiRequestBody">JSON request body <span>(optional)</span></label><textarea asp-for="currentService.ApiRequestBody" class="form-control" rows="3" placeholder="{ }"></textarea><small>Used for POST, PUT, and PATCH requests.</small><span asp-validation-for="currentService.ApiRequestBody" class="add-service-field-error"></span></div>
+                    </div>
                 </div>
                 <div class="add-service-field">
                     <label asp-for="currentService.RSSFeedLink">RSS feed URL <span>(optional)</span></label>
@@ -87,3 +113,22 @@
         </footer>
     </form>
 </main>
+
+@section Scripts {
+    <script>
+        (() => {
+            const selector = document.getElementById('monitorTypeSelect');
+            const update = () => {
+                const type = selector.value;
+                document.querySelectorAll('.monitor-option-ssl').forEach(el => el.hidden = type !== '3');
+                document.querySelectorAll('.monitor-option-api').forEach(el => el.hidden = type !== '4');
+                const portLabel = document.querySelector('label[for="currentService_Port"]');
+                const portHelp = document.querySelector('.service-port-help');
+                if (portLabel) portLabel.innerHTML = type === '1' ? 'TCP port <b>*</b>' : 'Port <span>(optional; SSL override)</span>';
+                if (portHelp) portHelp.textContent = type === '1' ? 'Port that must accept a TCP connection.' : 'Optional service port override.';
+            };
+            selector?.addEventListener('change', update);
+            update();
+        })();
+    </script>
+}

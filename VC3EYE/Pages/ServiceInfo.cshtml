@@ -145,6 +145,16 @@
 
             <section class="detail-card">
                 <div class="detail-card-heading"><div><div class="detail-kicker">CONFIGURATION</div><h2>Check settings</h2></div></div>
+                <div class="detail-setting-row"><span>Monitor type</span><strong>@(((VC3EYE.Models.ServiceMonitorType)service.MonitorType) switch { VC3EYE.Models.ServiceMonitorType.TcpPort => "TCP port", VC3EYE.Models.ServiceMonitorType.Dns => "DNS lookup", VC3EYE.Models.ServiceMonitorType.SslCertificate => "SSL certificate", VC3EYE.Models.ServiceMonitorType.Api => "API endpoint", _ => "HTTP availability" })</strong></div>
+                @if (service.MonitorType == (int)VC3EYE.Models.ServiceMonitorType.Api)
+                {
+                    <div class="detail-setting-row"><span>API check</span><strong>@service.ApiHttpMethod · expected @service.ExpectedStatusCode</strong></div>
+                    @if (!string.IsNullOrWhiteSpace(service.ApiExpectedContent)) { <div class="detail-setting-row"><span>Expected response text</span><strong>@service.ApiExpectedContent</strong></div> }
+                }
+                @if (service.MonitorType == (int)VC3EYE.Models.ServiceMonitorType.SslCertificate)
+                {
+                    <div class="detail-setting-row"><span>Certificate warning</span><strong>@service.SslExpiryWarningDays days</strong></div>
+                }
                 <div class="detail-setting-row"><span>Lookup term</span><strong>@(string.IsNullOrWhiteSpace(service.LookupTerm) ? "None" : service.LookupTerm)</strong></div>
                 <div class="detail-setting-row"><span>RSS feed</span><strong>@(string.IsNullOrWhiteSpace(service.RssfeedLink) ? "None" : service.RssfeedLink)</strong></div>
                 <div class="detail-setting-row"><span>Backup threshold</span><strong>@(service.NumOfBackup?.ToString() ?? "0")</strong></div>

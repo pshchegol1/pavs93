@@ -49,7 +49,13 @@ namespace VC3EYE.Pages
                 NotificationMessage = service.NotificationMessage,
                 IsDeleted = service.IsDeleted,
                 NotifyByMSTeams = service.NotifyByMsteams,
-                LookupTerm = service.LookupTerm
+                LookupTerm = service.LookupTerm,
+                MonitorType = (VC3EYE.Models.ServiceMonitorType)service.MonitorType,
+                ExpectedStatusCode = service.ExpectedStatusCode ?? 200,
+                ApiHttpMethod = service.ApiHttpMethod,
+                ApiExpectedContent = service.ApiExpectedContent,
+                ApiRequestBody = service.ApiRequestBody,
+                SslExpiryWarningDays = service.SslExpiryWarningDays
             };
 
             Service = serviceM;
@@ -85,25 +91,7 @@ namespace VC3EYE.Pages
                 }
             }
 
-            var serviceEntity = new ServiceController(_db).GetServiceByServiceID(serviceid);
             Service.ServiceID = serviceid;
-            if (serviceEntity != null)
-            {
-                Service.ServiceName = serviceEntity.ServiceName;
-                Service.ServiceURL = serviceEntity.Url;
-                Service.Location = serviceEntity.Location;
-                Service.IPAddress = serviceEntity.Ipaddress;
-                Service.GeneralInformation = serviceEntity.GeneralInformation;
-                Service.IsImportant = serviceEntity.IsImportant;
-                Service.Port = serviceEntity.Port;
-                Service.RSSFeedLink = serviceEntity.RssfeedLink;
-                Service.IsInternal = serviceEntity.IsInternal;
-                Service.NotifyByMSTeams = serviceEntity.NotifyByMsteams;
-                Service.NotificationMessage = serviceEntity.NotificationMessage;
-                Service.LookupTerm = serviceEntity.LookupTerm;
-                Service.NumOfBackup = serviceEntity.NumOfBackup;
-                Service.IsDeleted = serviceEntity.IsDeleted;
-            }
             return Page();
         }
     }

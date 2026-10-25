@@ -55,7 +55,13 @@ namespace VC3EYE.Data
                 UserId = service.UserID,
                 IsRunning = true,
                 IsDeleted = false,
-                LookupTerm = service.LookupTerm
+                LookupTerm = service.LookupTerm,
+                MonitorType = (int)service.MonitorType,
+                ExpectedStatusCode = service.ExpectedStatusCode,
+                ApiHttpMethod = service.ApiHttpMethod,
+                ApiExpectedContent = service.ApiExpectedContent,
+                ApiRequestBody = service.ApiRequestBody,
+                SslExpiryWarningDays = service.SslExpiryWarningDays
             };
 
             return serviceManager.AddService(s);
@@ -92,6 +98,12 @@ namespace VC3EYE.Data
                     service.NotificationMessage = serviceModel.NotificationMessage;
                     service.NotifyByMsteams = serviceModel.NotifyByMSTeams;
                     service.LookupTerm = serviceModel.LookupTerm;
+                    service.MonitorType = (int)serviceModel.MonitorType;
+                    service.ExpectedStatusCode = serviceModel.ExpectedStatusCode;
+                    service.ApiHttpMethod = serviceModel.ApiHttpMethod;
+                    service.ApiExpectedContent = serviceModel.ApiExpectedContent;
+                    service.ApiRequestBody = serviceModel.ApiRequestBody;
+                    service.SslExpiryWarningDays = serviceModel.SslExpiryWarningDays;
 
                     updated = sm.ModifyService(service);
                 }

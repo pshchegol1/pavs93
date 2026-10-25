@@ -51,6 +51,18 @@ public partial class Service
 
     public string? LookupTerm { get; set; }
 
+    public int MonitorType { get; set; }
+
+    public int? ExpectedStatusCode { get; set; }
+
+    public string ApiHttpMethod { get; set; } = "GET";
+
+    public string? ApiExpectedContent { get; set; }
+
+    public string? ApiRequestBody { get; set; }
+
+    public int SslExpiryWarningDays { get; set; }
+
     public bool IsIcmpRunning { get; set; }
 
     public int RunningDownCounter { get; set; }

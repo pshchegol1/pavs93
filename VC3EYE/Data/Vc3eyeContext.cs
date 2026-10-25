@@ -91,6 +91,12 @@ public partial class Vc3eyeContext : DbContext
             entity.Property(e => e.LastTimeChecked).HasColumnType("datetime");
             entity.Property(e => e.Location).HasMaxLength(50);
             entity.Property(e => e.LookupTerm).HasMaxLength(50);
+            entity.Property(e => e.MonitorType).HasDefaultValue(0);
+            entity.Property(e => e.ExpectedStatusCode);
+            entity.Property(e => e.ApiHttpMethod).HasMaxLength(10).HasDefaultValue("GET");
+            entity.Property(e => e.ApiExpectedContent).HasMaxLength(200);
+            entity.Property(e => e.ApiRequestBody).HasMaxLength(1000);
+            entity.Property(e => e.SslExpiryWarningDays).HasDefaultValue(14);
             entity.Property(e => e.NotificationMessage).HasMaxLength(100);
             entity.Property(e => e.NotifyByMsteams)
                 .IsRequired()

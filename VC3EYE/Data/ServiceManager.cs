@@ -3,12 +3,16 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Net.Security;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Diagnostics;
 
 using VC3EYE.Entities;
+using VC3EYE.Models;
 
 namespace VC3EYE.Data
 {
@@ -365,6 +369,141 @@ namespace VC3EYE.Data
                 timer.Stop();
                 return new HttpCheckResult(false, null, "HTTP check error", uri.ToString(), timer.ElapsedMilliseconds, ex.Message);
             }
+        }
+
+        public async Task<HttpCheckResult> CheckConfiguredMonitorAsync(Service service, CancellationToken cancellationToken = default)
+        {
+            var timer = Stopwatch.StartNew();
+            try
+            {
+                switch ((ServiceMonitorType)service.MonitorType)
+                {
+                    case ServiceMonitorType.Http:
+                        return await CheckHttp(service, service, cancellationToken);
+                    case ServiceMonitorType.TcpPort:
+                        var tcpHost = GetMonitorHost(service);
+                        if (string.IsNullOrWhiteSpace(tcpHost) || service.Port is not (> 0 and <= 65535))
+                            return new HttpCheckResult(false, null, "TCP monitor requires a valid host and port", null, timer.ElapsedMilliseconds, null);
+                        var tcpOk = await CheckTcpEndpointAsync(tcpHost, service.Port.Value, cancellationToken);
+                        return new HttpCheckResult(tcpOk, null, tcpOk ? $"TCP {tcpHost}:{service.Port} connected" : $"TCP {tcpHost}:{service.Port} connection failed", null, timer.ElapsedMilliseconds, null);
+                    case ServiceMonitorType.Dns:
+                        var dnsHost = GetMonitorHost(service, preferUrlHost: true);
+                        if (string.IsNullOrWhiteSpace(dnsHost))
+                            return new HttpCheckResult(false, null, "DNS monitor requires a hostname or IP address", null, timer.ElapsedMilliseconds, null);
+                        var addresses = await Dns.GetHostAddressesAsync(dnsHost, cancellationToken);
+                        var dnsMessage = addresses.Length > 0 ? $"DNS resolved {dnsHost} to {string.Join(", ", addresses.Select(a => a.ToString()).Take(4))}" : $"DNS returned no addresses for {dnsHost}";
+                        return new HttpCheckResult(addresses.Length > 0, null, dnsMessage, null, timer.ElapsedMilliseconds, null);
+                    case ServiceMonitorType.SslCertificate:
+                        var sslHost = GetMonitorHost(service, preferUrlHost: true);
+                        if (string.IsNullOrWhiteSpace(sslHost))
+                            return new HttpCheckResult(false, null, "SSL monitor requires a hostname", null, timer.ElapsedMilliseconds, null);
+                        return await CheckSslCertificateAsync(sslHost, service.Port ?? GetSslPort(service.Url), service.SslExpiryWarningDays, timer, cancellationToken);
+                    case ServiceMonitorType.Api:
+                        return await CheckApiAsync(service, timer, cancellationToken);
+                    default:
+                        return new HttpCheckResult(false, null, "Unknown monitor type", null, timer.ElapsedMilliseconds, null);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                timer.Stop();
+                return new HttpCheckResult(false, null, "Monitor check failed", null, timer.ElapsedMilliseconds, ex.Message);
+            }
+        }
+
+        private static string? GetMonitorHost(Service service, bool preferUrlHost = false)
+        {
+            var target = service.Url?.Trim();
+            if (preferUrlHost && !string.IsNullOrWhiteSpace(target))
+                return Uri.TryCreate(target, UriKind.Absolute, out var parsedUri) ? parsedUri.Host : target.TrimEnd('/');
+            if (!string.IsNullOrWhiteSpace(service.Ipaddress))
+                return service.Ipaddress.Trim();
+            if (string.IsNullOrWhiteSpace(target)) return null;
+            if (Uri.TryCreate(target, UriKind.Absolute, out var uri)) return uri.Host;
+            return target.TrimEnd('/');
+        }
+
+        private static int GetSslPort(string? url) =>
+            Uri.TryCreate(url, UriKind.Absolute, out var uri) && !uri.IsDefaultPort ? uri.Port : 443;
+
+        private static async Task<bool> CheckTcpEndpointAsync(string host, int port, CancellationToken cancellationToken)
+        {
+            var addresses = IPAddress.TryParse(host, out var ip)
+                ? new[] { ip }
+                : await Dns.GetHostAddressesAsync(host, cancellationToken);
+            foreach (var address in addresses)
+            {
+                try
+                {
+                    using var client = new TcpClient(address.AddressFamily);
+                    await client.ConnectAsync(address, port, cancellationToken);
+                    if (client.Connected) return true;
+                }
+                catch (SocketException) { }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            }
+            return false;
+        }
+
+        private static async Task<HttpCheckResult> CheckSslCertificateAsync(string host, int port, int warningDays, Stopwatch timer, CancellationToken cancellationToken)
+        {
+            X509Certificate2? certificate = null;
+            SslPolicyErrors policyErrors = SslPolicyErrors.None;
+            using var client = new TcpClient();
+            await client.ConnectAsync(host, port, cancellationToken);
+            using var ssl = new SslStream(client.GetStream(), leaveInnerStreamOpen: false, (_, cert, _, errors) =>
+            {
+                if (cert != null) certificate = new X509Certificate2(cert);
+                policyErrors = errors;
+                return true;
+            });
+            await ssl.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = host }, cancellationToken);
+            timer.Stop();
+            if (certificate == null)
+                return new HttpCheckResult(false, null, "TLS handshake completed without a server certificate", null, timer.ElapsedMilliseconds, null);
+
+            using (certificate)
+            {
+                var expires = certificate.NotAfter;
+                var daysLeft = (int)Math.Floor((expires.ToUniversalTime() - DateTime.UtcNow).TotalDays);
+                if (policyErrors != SslPolicyErrors.None)
+                    return new HttpCheckResult(false, null, $"Certificate validation failed: {policyErrors}", null, timer.ElapsedMilliseconds, null);
+                if (daysLeft < 0)
+                    return new HttpCheckResult(false, null, $"TLS certificate expired on {expires:u}", null, timer.ElapsedMilliseconds, null);
+                var message = daysLeft <= warningDays
+                    ? $"TLS certificate valid, expires in {daysLeft} day(s) (warning threshold: {warningDays})"
+                    : $"TLS certificate valid, expires in {daysLeft} day(s)";
+                return new HttpCheckResult(true, null, message, null, timer.ElapsedMilliseconds, null);
+            }
+        }
+
+        private static async Task<HttpCheckResult> CheckApiAsync(Service service, Stopwatch timer, CancellationToken cancellationToken)
+        {
+            if (!Uri.TryCreate(service.Url, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                return new HttpCheckResult(false, null, "API monitor requires an HTTP or HTTPS URL", null, timer.ElapsedMilliseconds, null);
+
+            using var request = new HttpRequestMessage(new HttpMethod(service.ApiHttpMethod), uri);
+            if (!string.Equals(service.ApiHttpMethod, "GET", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(service.ApiRequestBody))
+                request.Content = new StringContent(service.ApiRequestBody, Encoding.UTF8, "application/json");
+            using var response = await MonitoringHttpClient.SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken);
+            var statusCode = (int)response.StatusCode;
+            var expectedStatus = service.ExpectedStatusCode ?? 200;
+            var bodyMatches = true;
+            if (!string.IsNullOrWhiteSpace(service.ApiExpectedContent))
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                bodyMatches = body.Contains(service.ApiExpectedContent, StringComparison.OrdinalIgnoreCase);
+            }
+            timer.Stop();
+            var healthy = statusCode == expectedStatus && bodyMatches;
+            var detail = $"API {service.ApiHttpMethod} returned HTTP {statusCode} (expected {expectedStatus})";
+            if (!string.IsNullOrWhiteSpace(service.ApiExpectedContent)) detail += bodyMatches ? "; expected response text found" : "; expected response text missing";
+            return new HttpCheckResult(healthy, statusCode, detail, response.RequestMessage?.RequestUri?.ToString(), timer.ElapsedMilliseconds, null);
         }
 
         public async Task<bool> CheckHTTPStatus(object? state, Service s) => (await CheckHttp(state, s)).IsHealthy;

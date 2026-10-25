@@ -227,16 +227,9 @@ namespace VC3EYE.Pages
                 Service s = arg.Item2;
                 var st = new SettingContoller(_db).GetCurrentSetting();
                 var timer = System.Diagnostics.Stopwatch.StartNew();
-                var http = await sm.CheckHttp(s, s);
-                var passed = http.IsHealthy;
-                var diagnostic = $"{http.Message}{(http.Error == null ? "" : ": " + http.Error)}; {http.ElapsedMilliseconds} ms";
-
-                // A configured TCP port is a fallback when the HTTP endpoint is not healthy.
-                if (!passed && s.Port is > 0 && await sm.CheckPort(s, s))
-                {
-                    passed = true;
-                    diagnostic += "; TCP port reachable";
-                }
+                var check = await sm.CheckConfiguredMonitorAsync(s);
+                var passed = check.IsHealthy;
+                var diagnostic = $"{check.Message}{(check.Error == null ? "" : ": " + check.Error)}; {check.ElapsedMilliseconds} ms";
 
                 s.IsIcmpRunning = sm.CheckICMP(s);
                 diagnostic += s.IsIcmpRunning ? "; ICMP passed" : "; ICMP failed (informational)";
@@ -257,21 +250,15 @@ namespace VC3EYE.Pages
             {
                 ServiceManager sm = arg.Item1;
                 Service s = arg.Item2;
-                // This is a content diagnostic only. A missing term (common on
-                // JavaScript-rendered or bot-protected pages) must not change the
-                // service's availability state or send a false outage notification.
-                var termFound = await sm.CheckHTTPContent(s, s);
-                var result = await sm.CheckHttp(s, s);
-                var isAvailable = result.IsHealthy;
-                if (!isAvailable && s.Port is > 0 && await sm.CheckPort(s, s))
-                    isAvailable = true;
-
+                // Keep content matching informative: some pages render text client-side,
+                // so a missing phrase does not override the configured monitor result.
+                var termFound = !string.IsNullOrWhiteSpace(s.LookupTerm) && await sm.CheckHTTPContent(s, s);
+                var result = await sm.CheckConfiguredMonitorAsync(s);
                 var contentStatus = string.IsNullOrWhiteSpace(s.LookupTerm)
                     ? "content check skipped: no lookup term configured"
                     : termFound ? $"content check: '{s.LookupTerm}' found" : $"content check: '{s.LookupTerm}' not found";
-                var availabilityStatus = $"availability check: {(isAvailable ? "reachable" : "unreachable")}";
-                var diagnostic = $"{contentStatus}; {availabilityStatus}; {result.Message}";
-                sm.ApplyCheckResult(s, isAvailable, diagnostic, recoveryChecks: 1);
+                var diagnostic = $"{contentStatus}; {result.Message}{(result.Error == null ? "" : ": " + result.Error)}";
+                sm.ApplyCheckResult(s, result.IsHealthy, diagnostic, recoveryChecks: 1);
                 sm.ModifyService(s);
             }
         }

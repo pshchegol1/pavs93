@@ -18,11 +18,15 @@ namespace VC3EYE.Pages
         }
 
         [BindProperty]
-        public LoginInfoModel Login { get; set; }
+        public LoginInfoModel Login { get; set; } = new();
+
+        [BindProperty(SupportsGet = true)]
+        public string? ReturnUrl { get; set; }
 
         
-        public void OnGet()
+        public void OnGet(string? returnUrl = null)
         {
+            ReturnUrl = returnUrl;
         }
 
         public async Task<IActionResult> OnPostAsync()
@@ -60,11 +64,16 @@ namespace VC3EYE.Pages
 
                         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
                                new ClaimsPrincipal(claimsIdentity), authProperties);
+                        if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
+                        {
+                            return LocalRedirect(ReturnUrl);
+                        }
+                        return RedirectToPage("/Index");
                     }                 
                 }
                 else
                 {
-                    ModelState.AddModelError("Login.LoginError", "Incorrect Email or Password");
+                    ModelState.AddModelError("Login.LoginError", "Email or password is incorrect. Please try again.");
                 }
             }
 

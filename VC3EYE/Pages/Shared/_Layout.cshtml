@@ -1,8 +1,18 @@
-﻿@using VC3EYE.Data;
+@using VC3EYE.Data;
 @inject LogsManager logs;
 @{
-    string? userName = (User.Identity.IsAuthenticated) ? User.Identity.Name : "";
-    int errorLogs = logs.GetAllErrorLogs().Count;
+    string? userName = User.Identity?.IsAuthenticated == true ? User.Identity.Name : "";
+    string currentPage = ViewContext.RouteData.Values["page"]?.ToString() ?? "";
+    bool isHome = currentPage == "/Index";
+    bool isServices = currentPage == "/ServicesList" || currentPage == "/ServiceInfo" || currentPage == "/EditService";
+    bool isAddService = currentPage == "/AddService";
+    bool isLogs = currentPage == "/Logs";
+    bool isErrors = currentPage == "/ErrorLogs";
+    bool isSettings = currentPage == "/Settings";
+    bool isUsers = currentPage == "/ViewUsers";
+    bool isCharts = currentPage == "/Chartsofservices";
+    int errorLogs = User.IsInRole(SiteRoles.Administrator) ? logs.GetAllErrorLogs().Count : 0;
+    string userInitial = string.IsNullOrWhiteSpace(userName) ? "U" : userName.Trim()[0].ToString().ToUpperInvariant();
 }
 
 <!DOCTYPE html>
@@ -11,73 +21,57 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - VC3EYE</title>
-    <!-- Use Bootswatch Cerulean theme for Bootstrap -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@4.5.2/dist/spacelab/bootstrap.min.css" integrity="sha384-F1AY0h4TrtJ8OCUQYOzhcFzUTxSOxuaaJ4BeagvyQL8N9mE4hrXjdDsNx249NpEc" crossorigin="anonymous">
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
-    <!-- Custom and site styles -->
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/scripts-bs-siderbar.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/VC3EYE.styles.css" asp-append-version="true" />
 </head>
 <body class="app-body">
-    @if (User.Identity.IsAuthenticated)
+    @if (User.Identity?.IsAuthenticated == true)
     {
         <div class="d-flex" id="wrapper">
-            <!-- Sidebar-->
-            <div class="border-end bg-white" id="sidebar-wrapper">
-                <div class="sidebar-heading border-bottom bg-light"><a class="list-group-item list-group-item-action text-center" asp-page="/Index"><span class="brand-mark"><i class="bi bi-eye-fill"></i></span><span>VC3EYE</span></a></div>
-                <div class="list-group list-group-flush">
-                   
-                    <a class="list-group-item list-group-item-action list-group-item-light p-3" asp-page="/ServicesList"><b><i class="bi bi-info-square icon-bold"></i> Services</b></a>
+            <aside id="sidebar-wrapper" aria-label="Main navigation">
+                <div class="sidebar-heading">
+                    <a asp-page="/Index" class="sidebar-brand" aria-label="VC3EYE overview">
+                        <span class="brand-mark"><i class="bi bi-eye-fill"></i></span>
+                        <span class="sidebar-brand-copy"><strong>VC3EYE</strong><small>Service monitoring</small></span>
+                    </a>
+                </div>
+                <nav class="sidebar-nav">
+                    <span class="sidebar-section-label">WORKSPACE</span>
+                    <a class="sidebar-link @(isHome ? "active" : "")" asp-page="/Index" aria-current="@(isHome ? "page" : null)"><i class="bi bi-grid-1x2-fill"></i><span>Overview</span></a>
+                    <a class="sidebar-link @(isServices ? "active" : "")" asp-page="/ServicesList" aria-current="@(isServices ? "page" : null)"><i class="bi bi-hdd-network-fill"></i><span>Services</span></a>
+                    <a class="sidebar-link @(isAddService ? "active" : "")" asp-page="/AddService" aria-current="@(isAddService ? "page" : null)"><i class="bi bi-plus-square-fill"></i><span>Add service</span></a>
+
+                    <span class="sidebar-section-label sidebar-section-spaced">INSIGHTS</span>
+                    <a class="sidebar-link @(isLogs ? "active" : "")" asp-page="/Logs" aria-current="@(isLogs ? "page" : null)"><i class="bi bi-journal-text"></i><span>Activity logs</span></a>
                     @if (User.IsInRole(SiteRoles.Administrator))
                     {
-                        <a class="list-group-item list-group-item-action list-group-item-light p-3" asp-page="/AddService"><b><i class="bi bi-plus-square icon-bold"></i> Add Service</b></a>
-                        <a class="list-group-item list-group-item-action list-group-item-light p-3" asp-page="/Logs"><b><i class="bi bi-box-arrow-in-right icon-bold"></i> Change Logs</b></a>
-                        <a asp-page="/Settings" class="list-group-item list-group-item-action list-group-item-light p-3"><b><i class="bi bi-sliders2-vertical icon-bold"></i> Settings</b></a>
-                        <a asp-page="/ViewUsers" class="list-group-item list-group-item-action list-group-item-light p-3"><b><i class="bi bi-people icon-bold"></i> Users</b></a>
-                        <a asp-page="/Chartsofservices" class="list-group-item list-group-item-action list-group-item-light p-3"><b><i class="bi bi-people icon-bold"></i> Charts</b></a>
-                        <a class="list-group-item list-group-item-action list-group-item-light p-3" asp-page="/ErrorLogs">
-                            <b>
-                                <i class="bi bi-exclamation-square icon-bold"></i>
-                                Error Logs
-                                @if (errorLogs > 0)
-                                {
-                                    <span class="badge bg-danger">@errorLogs</span>
-                                }
-                            </b>
-                        </a>
+                        <a class="sidebar-link @(isErrors ? "active" : "")" asp-page="/ErrorLogs" aria-current="@(isErrors ? "page" : null)"><i class="bi bi-exclamation-triangle-fill"></i><span>Error logs</span>@if (errorLogs > 0) { <span class="sidebar-badge">@errorLogs</span> }</a>
+                        <a class="sidebar-link @(isCharts ? "active" : "")" asp-page="/Chartsofservices" aria-current="@(isCharts ? "page" : null)"><i class="bi bi-bar-chart-fill"></i><span>Charts</span></a>
+                        <span class="sidebar-section-label sidebar-section-spaced">ADMINISTRATION</span>
+                        <a class="sidebar-link @(isUsers ? "active" : "")" asp-page="/ViewUsers" aria-current="@(isUsers ? "page" : null)"><i class="bi bi-people-fill"></i><span>Users</span></a>
+                        <a class="sidebar-link @(isSettings ? "active" : "")" asp-page="/Settings" aria-current="@(isSettings ? "page" : null)"><i class="bi bi-sliders2-vertical"></i><span>Settings</span></a>
                     }
-                    @if (User.IsInRole(SiteRoles.User))
-                    {
-                        <a class="list-group-item list-group-item-action list-group-item-light p-3" asp-page="/AddService"><b><i class="bi bi-plus-square icon-bold"></i> Add Service</b></a>
-                        <a class="list-group-item list-group-item-action list-group-item-light p-3" asp-page="/Logs"><b><i class="bi bi-box-arrow-in-right icon-bold"></i> Logs</b></a>
-                    }
+                </nav>
+                <div class="sidebar-account">
+                    <span class="sidebar-avatar">@userInitial</span>
+                    <span class="sidebar-user-copy"><strong>@userName</strong><small>@(User.IsInRole(SiteRoles.Administrator) ? "Administrator" : "User")</small></span>
+                    <form method="post" asp-page="/Login" asp-page-handler="Logout">
+                        <button type="submit" class="sidebar-logout" title="Sign out" aria-label="Sign out"><i class="bi bi-box-arrow-right"></i></button>
+                    </form>
                 </div>
-            </div>
-            <!-- Page content wrapper-->
+            </aside>
+            <button type="button" id="sidebarBackdrop" class="sidebar-backdrop" aria-label="Close navigation"></button>
             <div id="page-content-wrapper">
-                <!-- Top navigation-->
-                <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom app-topbar">
+                <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom app-topbar" aria-label="Page toolbar">
                     <div class="container-fluid">
-                        <button class="btn btn-primary" id="sidebarToggle"><i class="bi bi-list"></i></button>
-                        <form method="post" asp-page="/Login" asp-page-handler="Logout">
-                            <button class="navbar-toggler mobile-logout" type="submit" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="badge bg-dark">@userName</span> <i class="bi bi-box-arrow-left"></i></button>
-                        </form>
-                       
-                        <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                            <ul class="navbar-nav ms-auto mt-2 mt-lg-0">
-                                <li class="nav-item active"><a class="nav-link" asp-page="/Index">Home</a></li>
-                                <li class="nav-item"><a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Welcome <span class="badge badge-info">@userName</span></a></li>
-                            </ul>
-                            
-                             <form method="post" asp-page="/Login" asp-page-handler="Logout">
-                                <button type="submit" class="btn btn-outline-primary"><i class="bi bi-box-arrow-left"></i> Logout</button>
-                            </form>
-                        </div>
+                        <button class="btn btn-primary" id="sidebarToggle" type="button" aria-label="Toggle navigation" aria-controls="sidebar-wrapper" aria-expanded="true"><i class="bi bi-list"></i></button>
+                        <div class="topbar-context"><span class="topbar-context-dot"></span><span>Monitoring dashboard</span></div>
+                        <div class="topbar-user"><i class="bi bi-person-circle"></i><span>@userName</span></div>
                     </div>
                 </nav>
-                <!-- Page content-->
                 <div class="container-fluid app-content">
                     <main role="main" class="pb-3 app-main">
                         @RenderBody()
@@ -85,27 +79,19 @@
                 </div>
             </div>
         </div>
-
         <footer class="border-top footer bg-light text-muted app-footer">
-            <div class="container-fluid d-flex justify-content-center footer-con">
-                &copy; 2023 - VC3EYE - <a asp-area="" asp-page="/Privacy">Privacy</a>
-            </div>
+            <div class="container-fluid d-flex justify-content-center footer-con">&copy; 2023 - VC3EYE - <a asp-area="" asp-page="/Privacy">Privacy</a></div>
         </footer>
     }
     else
     {
-        <div class="container-fluid">
-            <main role="main" class="pb-3">
-                @RenderBody()
-            </main>
-        </div>
-    } 
+        <div class="container-fluid"><main role="main" class="pb-3">@RenderBody()</main></div>
+    }
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/scripts-bs-siderbar.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
-
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -1,36 +1,40 @@
-﻿@page
+@page
 @model VC3EYE.Pages.LoginModel
 @{
-    ViewData["Title"] = "Login";
+    ViewData["Title"] = "Sign in";
 }
 
-<div class="vh-100 d-flex justify-content-center align-items-center">
-    <div class="container">
-        <div class="row d-flex justify-content-center">
-            <div class="col-12 col-md-8 col-lg-6">
-                <div class="card bg-white">
-                    <div class="card-body p-5">
-                        <form method="post" class="mb-3 mt-md-4">
-                            <h2 class="fw-bold mb-2 text-uppercase "><i class="bi bi-eye-fill"></i> VC3EYE</h2>
-                            <p class=" mb-5">Please enter your login and password!</p>
-                            <span asp-validation-for="Login.LoginError" class="text-danger"></span>
-                            <div class="mb-3">
-                                <label asp-for="Login.Email"><b>Email</b></label>
-                                <input type="email" asp-for="Login.Email" class="form-control" placeholder="Email" />
-                                <span asp-validation-for="Login.Email" class="text-danger"></span>
-                            </div>
-                            <div class="mb-3">
-                                <label asp-for="Login.Password"><b>Password</b></label>
-                                <input type="password" asp-for="Login.Password" class="form-control" placeholder="Password" />
-                                <span asp-validation-for="Login.Password" class="text-danger"></span>
-                            </div>                         
-                            <div class="d-grid">
-                                <button class="btn btn-outline-dark" type="submit">Login</button>
-                            </div>
-                        </form>                      
-                    </div>
-                </div>
+<main class="login-page">
+    <section class="login-shell" aria-labelledby="login-title">
+        <div class="login-brand-panel">
+            <div class="login-brand-mark"><i class="bi bi-eye-fill"></i></div>
+            <span class="login-brand-name">VC3EYE</span>
+            <div class="login-brand-copy">
+                <span class="login-brand-eyebrow">SERVICE STATUS, AT A GLANCE</span>
+                <h2>Stay ahead of interruptions.</h2>
+                <p>Monitor the services your team depends on from one clear dashboard.</p>
             </div>
+            <div class="login-brand-decoration" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
         </div>
-    </div>
-</div>
+
+        <div class="login-form-panel">
+            <div class="login-welcome"><span>WELCOME BACK</span><h1 id="login-title">Sign in to VC3EYE</h1><p>Enter your account details to continue.</p></div>
+            <form method="post" class="login-form">
+                <input type="hidden" asp-for="ReturnUrl" />
+                <div asp-validation-summary="ModelOnly" class="login-validation" role="alert"></div>
+                <div class="login-field">
+                    <label asp-for="Login.Email">Email address</label>
+                    <div class="login-input-wrap"><i class="bi bi-envelope" aria-hidden="true"></i><input type="email" asp-for="Login.Email" class="form-control" placeholder="you@example.com" autocomplete="username" autofocus /></div>
+                    <span asp-validation-for="Login.Email" class="login-field-error"></span>
+                </div>
+                <div class="login-field">
+                    <label asp-for="Login.Password">Password</label>
+                    <div class="login-input-wrap"><i class="bi bi-lock" aria-hidden="true"></i><input type="password" asp-for="Login.Password" class="form-control" placeholder="Enter your password" autocomplete="current-password" /></div>
+                    <span asp-validation-for="Login.Password" class="login-field-error"></span>
+                </div>
+                <button class="login-submit" type="submit">Sign in <i class="bi bi-arrow-right"></i></button>
+            </form>
+            <div class="login-secure-note"><i class="bi bi-shield-check"></i> Secure access to your monitoring dashboard</div>
+        </div>
+    </section>
+</main>

@@ -104,25 +104,14 @@ namespace VC3EYE
         private async Task CheckServiceAsync(ServiceManager manager, Service service, CancellationToken cancellationToken)
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var http = string.IsNullOrWhiteSpace(service.Url)
-                ? new HttpCheckResult(false, null, "No URL configured", null, 0, null)
-                : await manager.CheckHttp(service, service, cancellationToken);
-
-            var running = http.IsHealthy;
-            var portCheck = false;
-            if (!running && service.Port is > 0)
-            {
-                portCheck = await manager.CheckPort(service, service, cancellationToken);
-                running = portCheck;
-            }
+            var check = await manager.CheckConfiguredMonitorAsync(service, cancellationToken);
+            var running = check.IsHealthy;
 
             service.IsIcmpRunning = manager.CheckICMP(service);
             var wasRunning = service.IsRunning;
-            var description = $"{http.Message}; {http.ElapsedMilliseconds} ms";
-            if (http.Error != null)
-                description += $": {http.Error}";
-            if (service.Port is > 0)
-                description += portCheck ? "; TCP port reachable" : "; TCP port failed";
+            var description = $"{check.Message}; {check.ElapsedMilliseconds} ms";
+            if (check.Error != null)
+                description += $": {check.Error}";
             description += service.IsIcmpRunning ? "; ICMP passed" : "; ICMP failed (informational)";
 
             manager.ApplyCheckResult(service, running, description);
@@ -134,10 +123,10 @@ namespace VC3EYE
                 {
                     ServiceId = service.ServiceId,
                     DateAdded = DateTime.Now,
-                    Htmlresponse = http.Message + (http.Error == null ? "" : ": " + http.Error),
-                    ResponseTime = TimeSpan.FromMilliseconds(http.ElapsedMilliseconds),
+                    Htmlresponse = check.Message + (check.Error == null ? "" : ": " + check.Error),
+                    ResponseTime = TimeSpan.FromMilliseconds(check.ElapsedMilliseconds),
                     IsPingFailed = !service.IsIcmpRunning,
-                    IsPortFailed = service.Port.HasValue && !portCheck,
+                    IsPortFailed = service.MonitorType == (int)VC3EYE.Models.ServiceMonitorType.TcpPort && !running,
                     IsRssfeedFailed = false
                 };
                 await manager.AddServiceDownHistoryAsync(history, cancellationToken);
